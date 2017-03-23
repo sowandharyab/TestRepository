@@ -1,5 +1,0 @@
-<<<<<<< .merge_file_a08996
-hi hello this is test
-=======
-hi test master branch
->>>>>>> .merge_file_a04140
