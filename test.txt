@@ -1,1 +1,2 @@
-hi test master branch
+hi this is master branch
+trying out smaple
