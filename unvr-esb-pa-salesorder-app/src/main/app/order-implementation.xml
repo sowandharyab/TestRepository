@@ -21,15 +21,7 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         <logger message="Validated xml  #[payload]" level="INFO" doc:name="Validated  xml"/>
         <logger message="Call to DCS_MQ API" level="INFO" doc:name="Call to DCS_MQ api"/>
 
-        <http:request config-ref="unvr-esb-sa-dcsmq-HTTP_Request_Configuration" path="/order" method="POST" doc:name="POST_http_dcs_mq" responseTimeout="60000">
-            <http:request-builder>
-                <http:query-param paramName="client_id" value="${sa_client_Id}"/>
-                <http:query-param paramName="client_secret" value="${sa_client_secret}"/>
-
-
-
-
-            </http:request-builder>
+        <http:request config-ref="sa-dcsmq-http-call" path="/order" method="POST" doc:name="POST_http_dcs_mq" responseTimeout="60000">
         </http:request>
         <exception-strategy ref="SalesOrderCoupaApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
         

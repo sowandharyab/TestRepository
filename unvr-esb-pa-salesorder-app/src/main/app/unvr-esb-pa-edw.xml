@@ -15,8 +15,13 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
 http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
 http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
     <http:request-config name="HTTP_Request_Configuration1" host="${system.api.host}" port="8092" basePath="/" connectionIdleTimeout="12000000" doc:name="HTTP Request Configuration" responseTimeout="12000000"/>
-<https:connector name="HTTPS_CLIENT_TLS_v1.1" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS">
-    <spring:property name="sslType" value="TLSv1.1"/>
+	<https:connector name="HTTPS_CLIENT_TLS_v1.1" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS">
+        <spring:property name="sslType" value="TLSv1.1"/>
+        <https:tls-server path="truststore-edw-app-${environment}.jks" storePassword="${ssl.jks.storepass}" type="jks"/>
+	</https:connector>
+	<https:connector name="HTTPS_CLIENT_TLS_v1.2" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS">
+        <spring:property name="sslType" value="TLSv1.1"/>
+		<https:tls-server path="truststore-dcsdb2-app-${environment}.jks" storePassword="${ssl.jks.storepass}" type="jks"/>
 	</https:connector>
     <https:endpoint exchange-pattern="request-response" method="POST" connector-ref="" name="HTTP-DCS" address="https://unvr-esb-sa-edw-api-dev01.cloudhub.io/orderhistory/salesorder?client_id=a50033aef6454b2aa6797c2772279c8d&amp;client_secret=35b3120b1bb94d6d8D3097BC0D8CA1DA"  responseTimeout="0" doc:name="HTTP" contentType="application/xml"/>
 
@@ -77,11 +82,11 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
             <http:success-status-code-validator values="0..500"/>
         </http:request> -->
        
-         <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.dcs.order.search}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.1">
+         <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.dcs.order.search}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.2">
             <response> 
                 <object-to-string-transformer/> 
             </response>
-        </https:outbound-endpoint>         
+            </https:outbound-endpoint>
          <object-to-string-transformer doc:name="Object to String"/>
         <logger message="Response from DCS: #[payload]" level="INFO" doc:name="Logger"/>
 
@@ -89,17 +94,6 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
     </flow>
 
     <flow name="EDW_Order_Lookup_Flow">
-        <logger message="Calling EDW: #[payload]" level="INFO" doc:name="Logger"/>
-
-        <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.order.search}" responseTimeout="12000000" contentType="application/xml" doc:name="HTTP-OrderSearch" connector-ref="HTTPS_CLIENT_TLS_v1.1" keepAlive="true">
-        	<response> 
-                        <object-to-string-transformer/> 
-                    </response>
-                    </https:outbound-endpoint>
-        <logger level="INFO" doc:name="Logger" message="Response from EDW: #[payload]"/>
-        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
-    </flow>
-    <flow name="EDW_Order_Lookup_Flow_V_2.0">
         <logger message="Calling EDW: #[payload]" level="INFO" doc:name="Logger"/>
 
         <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.order.search.v2.0}" responseTimeout="12000000" contentType="application/xml" doc:name="HTTP-OrderSearch" connector-ref="HTTPS_CLIENT_TLS_v1.1" keepAlive="true">
@@ -153,7 +147,7 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
     <sub-flow name="OrderDetails-DCS">
         <logger message="Going to check Order details in DCS ..      " level="INFO" doc:name="DCSFlow - Logger"/>
 
-      <https:outbound-endpoint exchange-pattern="request-response" method="POST"  responseTimeout="0" contentType="application/xml" doc:name="DCS - System API call " address="${system.dcs.order.details}" keepAlive="true" encoding="UTF-8" connector-ref="HTTPS_CLIENT_TLS_v1.1">
+      <https:outbound-endpoint exchange-pattern="request-response" method="POST"  responseTimeout="0" contentType="application/xml" doc:name="DCS - System API call " address="${system.dcs.order.details}" keepAlive="true" encoding="UTF-8" connector-ref="HTTPS_CLIENT_TLS_v1.2">
         	<response> 
                         <object-to-string-transformer/> 
                     </response>
