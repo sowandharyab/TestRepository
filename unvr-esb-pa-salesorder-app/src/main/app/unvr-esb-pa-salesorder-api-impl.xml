@@ -1,11 +1,13 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<mule xmlns:tcp="http://www.mulesoft.org/schema/mule/tcp" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder" xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq"
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:tcp="http://www.mulesoft.org/schema/mule/tcp" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder" xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq"
     xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:context="http://www.springframework.org/schema/context"
     xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
     xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core"
     xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans"
     xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-    xsi:schemaLocation="http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+    xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
 http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
 http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
 http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
@@ -32,6 +34,18 @@ http://www.mulesoft.org/schema/mule/tcp http://www.mulesoft.org/schema/mule/tcp/
         basePath="${system.api.basePath}" doc:name="HTTP Request Configuration" connectionIdleTimeout="1200000" responseTimeout="1200000">
         <tcp:client-socket-properties connectionTimeout="0" keepAlive="false"/>
     </http:request-config>
+    <http:request-config
+      name="sa-dcsdb2-http-call"
+      host="${system.app.dcsdb2.host}"
+      port="${system.app.dcsdb2.port}"
+      basePath="${system.app.dcsdb2.path}"
+      protocol="HTTPS" doc:name="HTTP Request Configuration" connectionIdleTimeout="1200000" responseTimeout="1200000">
+      <tcp:client-socket-properties connectionTimeout="0" keepAlive="false"/>
+        <tls:context>
+            <tls:trust-store path="truststore-dcsdb2-app-${environment}.jks" password="${ssl.jks.storepass}" type="jks"/>
+        </tls:context>
+    </http:request-config>
+    
 
   <wmq:connector name="WMQ" hostName="${wmq.host}" port="${wmq.port}" queueManager="${wmq.queue.manager}" channel="${wmq.channel}" 
     username="${wmq.username}" password="${wmq.password}" transportType="CLIENT_MQ_TCPIP" validateConnections="true" 
@@ -107,13 +121,11 @@ http://www.mulesoft.org/schema/mule/tcp http://www.mulesoft.org/schema/mule/tcp/
         <logger message="#[payload]" level="INFO" doc:name="Logging xml request to univar system api"></logger>
         
         <logger message="Invoking System API: ${system.api.host}, ${system.api.port}, ${system.api.basePath}" level="INFO" doc:name="Log system api properties"></logger>
-        <http:request config-ref="HTTP_Request_Configuration" path="/cumulative-total" method="POST"
+        <http:request config-ref="sa-dcsdb2-http-call" path="/cumulative-total" method="POST"
             doc:name="Call Univar system get-cumulative-total api">
             <http:request-builder>
-                <http:header headerName="Content-Type" value="application/xml"></http:header>
-                <http:header headerName="Accept" value="application/xml"></http:header>
-                <http:query-param paramName="client_id" value="#[flowVars.clientId]"></http:query-param>
-                <http:query-param paramName="client_secret" value="#[flowVars.clientSecret]"></http:query-param>
+                <http:header headerName="Content-Type" value="application/xml"/>
+                <http:header headerName="Accept" value="application/xml"/>
             </http:request-builder>
             <http:success-status-code-validator values="200"></http:success-status-code-validator>
         </http:request>
@@ -149,4 +161,6 @@ http://www.mulesoft.org/schema/mule/tcp http://www.mulesoft.org/schema/mule/tcp/
             </dw:transform-message>
         </catch-exception-strategy>
     </choice-exception-strategy>
+    
+
 </mule>
