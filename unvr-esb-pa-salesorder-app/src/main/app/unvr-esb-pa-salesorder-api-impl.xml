@@ -1,0 +1,166 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:tls="http://www.mulesoft.org/schema/mule/tls"
+	xmlns:tcp="http://www.mulesoft.org/schema/mule/tcp" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder" xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq"
+    xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:context="http://www.springframework.org/schema/context"
+    xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+    xmlns:db="http://www.mulesoft.org/schema/mule/db" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns="http://www.mulesoft.org/schema/mule/core"
+    xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:spring="http://www.springframework.org/schema/beans"
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
+http://www.springframework.org/schema/context http://www.springframework.org/schema/context/spring-context-current.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-3.1.xsd
+http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/secure-property-placeholder http://www.mulesoft.org/schema/mule/secure-property-placeholder/current/mule-secure-property-placeholder.xsd
+http://www.mulesoft.org/schema/mule/tcp http://www.mulesoft.org/schema/mule/tcp/current/mule-tcp.xsd">
+
+    <secure-property-placeholder:config name="Secure_Property_Placeholder" encryptionAlgorithm="Blowfish" 
+        key="${vault.key}" location="${environment}.properties,common.properties" 
+        ignoreResourceNotFound="true" doc:name="Secure Property Placeholder"/>
+
+    <spring:beans>
+        <spring:bean id="schemaValidationBean" name="schemaValidationBean" class="com.univar.SchemaValidator"/>
+    </spring:beans>
+
+    <configuration defaultExceptionStrategy-ref="SalesOrderApiCatchExceptionStrategy" doc:name="Configuration"/>
+
+    <http:request-config name="HTTP_Request_Configuration" host="${system.api.host}" port="${system.api.port}" protocol="HTTPS"
+        basePath="${system.api.basePath}" doc:name="HTTP Request Configuration" connectionIdleTimeout="1200000" responseTimeout="1200000">
+        <tcp:client-socket-properties connectionTimeout="0" keepAlive="false"/>
+    </http:request-config>
+    <http:request-config
+      name="sa-dcsdb2-http-call"
+      host="${system.app.dcsdb2.host}"
+      port="${system.app.dcsdb2.port}"
+      basePath="${system.app.dcsdb2.path}"
+      protocol="HTTPS" doc:name="HTTP Request Configuration" connectionIdleTimeout="1200000" responseTimeout="1200000">
+      <tcp:client-socket-properties connectionTimeout="0" keepAlive="false"/>
+        <tls:context>
+            <tls:trust-store path="truststore-dcsdb2-app-${environment}.jks" password="${ssl.jks.storepass}" type="jks"/>
+        </tls:context>
+    </http:request-config>
+    
+
+  <wmq:connector name="WMQ" hostName="${wmq.host}" port="${wmq.port}" queueManager="${wmq.queue.manager}" channel="${wmq.channel}" 
+    username="${wmq.username}" password="${wmq.password}" transportType="CLIENT_MQ_TCPIP" validateConnections="true" 
+     doc:name="WMQ" dynamicNotification="true" specification="1.1">
+           <reconnect frequency="${wmq.reconnect.frequency}" count="${wmq.reconnect.count}" blocking="false"/>
+        </wmq:connector>    
+
+    <sub-flow name="unvr-esb-pa-salesorder-api-impl-main-subflow">
+        <logger level="INFO" doc:name="Logging the message from MQ" message="Messge ID before Back up queue :#[flowVars.messageId]"></logger>
+        <byte-array-to-string-transformer doc:name="Byte array to xml string" encoding="UTF-8"
+            mimeType="application/xml"></byte-array-to-string-transformer>
+        <wmq:outbound-endpoint queue="${wmq.queue.backup}" connector-ref="WMQ" correlationId="#[flowVars.messageId]"
+            doc:name="Send message to the backup queue"></wmq:outbound-endpoint>
+        <set-variable variableName="originalMessage" value="#[payload]" doc:name="Set original message from MQ in flow variable"></set-variable>
+        <set-variable variableName="messageId" value="#[message.id]" doc:name="Set message id in the flow variable"></set-variable>
+        <flow-ref name="processSalesOrderMessage_SubFlow" doc:name="processSalesOrderMessage_SubFlow"></flow-ref>
+    </sub-flow>
+
+    <flow name="unvr-esb-pa-salesorder-mq_Flow">
+        <wmq:inbound-endpoint queue="${wmq.queue.request}" connector-ref="WMQ"
+            doc:name="Consume message from univar request queue"></wmq:inbound-endpoint>
+        <logger level="INFO" doc:name="Logging the message from MQ"></logger>
+        <byte-array-to-string-transformer doc:name="Byte array to xml string" encoding="UTF-8"
+            mimeType="application/xml"></byte-array-to-string-transformer>
+        <logger level="INFO" message="Before pushing message to backup queue." doc:name="Push message to backup Queue"/>
+        <wmq:outbound-endpoint queue="${wmq.queue.backup}" connector-ref="WMQ" correlationId="#[flowVars.messageId]"
+            doc:name="Send message to the backup queue">
+        </wmq:outbound-endpoint>
+        <set-variable variableName="originalMessage" value="#[payload]" doc:name="Set original message from MQ in flow variable"></set-variable>
+        <set-variable variableName="messageId" value="#[message.inboundProperties.'JMSMessageID']" doc:name="Set message id in the flow variable"></set-variable>
+        <logger level="INFO" message="Before calling process salesorder subflow" doc:name="Call process salesorder subflow"/>
+        <flow-ref name="processSalesOrderMessage_SubFlow" doc:name="processSalesOrderMessage_SubFlow"></flow-ref>
+        <exception-strategy ref="SalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    <sub-flow name="processSalesOrderMessage_SubFlow">
+        <logger level="INFO" message="Inside processSalesOrderMessage_SubFlow:#[flowVars.messageId]" doc:name="Log flow entry"/>
+        <set-variable variableName="clientId" value="${client.id}" doc:name="Set client id in flow variable"></set-variable>
+        <set-variable variableName="clientSecret" value="${client.secret}" doc:name="Set client secret in flow variable"></set-variable>
+        <logger level="INFO" message="Before schema validation - xml.validation.enabled=${xml.validation.enabled}" doc:name="Validating XML input"/>
+        <choice doc:name="If schema validation enabled">
+            <when expression="${xml.validation.enabled} == true">
+                <logger message="Schema validation xsd: ${xml.schema.location}" level="INFO" doc:name="Logger"/>
+                <invoke object-ref="schemaValidationBean" method="validateXML" 
+                    methodArguments="#[message.payloadAs(java.lang.String)], ${xml.schema.location}" doc:name="Invoke schema validation"/>
+                <logger message="Completed schema validation - Sales cumulative total API request." level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="Schema validation is disabled for sales cumulative total API." level="INFO" doc:name="Logger"></logger>
+            </otherwise>
+        </choice>
+        <logger level="INFO" message="Calling System API with payload: #[payload]" doc:name="Call System API"/>
+        <flow-ref name="call-system-api_SubFlow" doc:name="call-system-api_SubFlow"></flow-ref>
+        <logger level="INFO" message="Response from System API: #[payload]" 
+            doc:name="System API Response"/>
+        <logger message="Correlation id of the message set in response queue: #[flowVars.messageId]" level="INFO"
+            doc:name="Correlation ID logging"></logger>
+        <logger level="INFO" message="Pushing message to Reply Queue with payload: #[payload]" 
+            doc:name="Push message to Reply Queue"/>
+        <logger level="INFO" message="Pushing message to Reply Queue with correlation ID: #[flowVars.messageId]" 
+            doc:name="Push message to Reply Queue"/>
+        <wmq:outbound-endpoint queue="${wmq.queue.response}" connector-ref="WMQ"
+            doc:name="Send successful message to reply queue" correlationId="#[flowVars.messageId]" messageType="MQMT_REPLY"></wmq:outbound-endpoint>
+    </sub-flow>
+
+    <sub-flow name="call-system-api_SubFlow">
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <dw:transform-message doc:name="Transform MQ xml to http request xml">
+            <dw:input-payload doc:sample="sample_input_message.xml" />
+            <dw:set-payload resource="classpath:transformers/process_api_payload_to_system_api_payload_transformer.dwl" />
+        </dw:transform-message>
+        <byte-array-to-string-transformer encoding="UTF-8" mimeType="application/xml" doc:name="Byte array to xml string"></byte-array-to-string-transformer>
+        <logger message="#[payload]" level="INFO" doc:name="Logging xml request to univar system api"></logger>
+        
+        <logger message="Invoking System API: ${system.api.host}, ${system.api.port}, ${system.api.basePath}" level="INFO" doc:name="Log system api properties"></logger>
+        <http:request config-ref="sa-dcsdb2-http-call" path="/cumulative-total" method="POST"
+            doc:name="Call Univar system get-cumulative-total api">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/xml"/>
+                <http:header headerName="Accept" value="application/xml"/>
+            </http:request-builder>
+            <http:success-status-code-validator values="200"></http:success-status-code-validator>
+        </http:request>
+        <byte-array-to-string-transformer doc:name="Byte array to xml string" encoding="UTF-8"
+            mimeType="application/xml"></byte-array-to-string-transformer>
+        <logger message="Http response status code: #[message.inboundProperties.'http.status']" level="INFO"
+            doc:name="Logging univar-system-api http status code"></logger>
+    </sub-flow>
+
+    <choice-exception-strategy name="SalesOrderApiCatchExceptionStrategy">
+        <catch-exception-strategy when="exception.causedBy(org.xml.sax.SAXParseException)" doc:name="Catch Exception Strategy">
+            <logger level="ERROR" message="Caught org.xml.sax.SAXParseException. Pushing message to ${wmq.queue.failure} Queue." 
+                doc:name="Log error message"/>
+            <set-payload value="#[flowVars.originalMessage]" encoding="UTF-8" mimeType="application/xml"
+                doc:name="Set original message to the failure queue"></set-payload>
+            <wmq:outbound-endpoint queue="${wmq.queue.failure}" connector-ref="WMQ"
+                doc:name="Send error message to failure queue" correlationId="#[flowVars.messageId]"></wmq:outbound-endpoint>
+            <set-variable variableName="exceptionDetails" value="#[exception.cause.message]" doc:name="Variable"></set-variable>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload resource="classpath:transformers/transform-schema-validation-exception.dwl"></dw:set-payload>
+            </dw:transform-message>
+        </catch-exception-strategy>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger level="ERROR" message="Caught Exception #[exception]. Pushing message to ${wmq.queue.failure} Queue." 
+                doc:name="Log error message"/>
+            <set-payload value="#[flowVars.originalMessage]" encoding="UTF-8" mimeType="application/xml"
+                doc:name="Set original message to the failure queue"></set-payload>
+            <wmq:outbound-endpoint queue="${wmq.queue.failure}" connector-ref="WMQ"
+                doc:name="Send error message to failure queue" correlationId="#[flowVars.messageId]"></wmq:outbound-endpoint>
+            <set-variable variableName="exceptionDetails" value="#[exception.cause.message]" doc:name="Variable"></set-variable>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload resource="classpath:transformers/transform-generic-exception.dwl"></dw:set-payload>
+            </dw:transform-message>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+    
+
+</mule>
