@@ -72,7 +72,10 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
         <flow-ref name="OrderHistory-pa-impl-v2.0Flow" doc:name="OrderHistory-pa-impl-v2.0Flow" />
         <exception-strategy ref="SalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy" />
     </flow>
-   
+    <flow name="post:/orderhistory/orderdetails:unvr-esb-pa-salesorder-api-config">
+        <flow-ref name="SalesOrder" doc:name="OrderDetails" />
+        <exception-strategy ref="SalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy" />
+    </flow>
     <flow name="post:/cases-orderdetails:unvr-esb-pa-salesorder-api-config">
         <flow-ref name="CasesOrderHistoryDetail" doc:name="cases-OrderDetails" />
         <exception-strategy ref="SalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy" />
