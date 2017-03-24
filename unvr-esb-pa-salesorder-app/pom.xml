@@ -95,7 +95,7 @@
                                 <resource>
                                     <directory>../resources/</directory>
                                     <includes>
-                                        <include>**/keystore-app-${environment}.jks</include>
+                                        <include>**/*.jks</include>
                                     </includes>
                                 </resource>
                                 <resource>

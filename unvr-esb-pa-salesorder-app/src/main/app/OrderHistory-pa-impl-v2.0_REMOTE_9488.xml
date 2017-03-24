@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd">
+    <flow name="OrderHistory-pa-impl-v2.0Flow">
+        <object-to-string-transformer doc:name="Object to String" encoding="UTF-8"/>
+        <set-variable variableName="schemaLocation" value="${xml.schema.location.orderHistory.v2.0}" doc:name="Set Schema Location"/>
+        <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="status" value="#[xpath3(&quot;/*[local-name()='OrderRequest']/*[local-name()='Order_Status']&quot;)]"/>
+        </message-properties-transformer>
+        <flow-ref name="EDW_Order_Lookup_Flow" doc:name="EDW_Order_Lookup_Flow"/>
+        <!-- <set-payload value="#[payload.replaceAll(&quot;&amp;lt;&quot;, &quot;&lt;&quot;).replaceAll(&quot;'&quot;, '&quot;').replaceAll(&quot;&amp;gt;&quot;, &quot;&gt;&quot;).toString()]" mimeType="application/xml" doc:name="Copy_of_Set Payload"/> -->
+        <logger message="#[payload]" level="INFO" doc:name="Log_System_Layer_Response"/>
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+</mule>
