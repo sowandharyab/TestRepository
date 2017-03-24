@@ -36,9 +36,15 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
                 <logger message="Schema validation xsd: ${xml.schema.location}" level="INFO" doc:name="Schema validation"/>
                 <invoke object-ref="schemaValidationBean" method="validateXML" 
                     methodArguments="#[message.payloadAs(java.lang.String)], ${xml.schema.coupacanonical.location}" doc:name="Invoke schema validation"/>
-                <logger message="Completed schema validation " level="INFO" doc:name="Validation completed"/>
+ 	               <logger message="Completed schema validation " level="INFO" doc:name="Validation completed"/>
+<logger message="Schema validation is disabled." level="INFO" doc:name="Validation not required"></logger>
             </when>
+
             <otherwise>
+<set-payload value="#[flowVars.originalMessage]" encoding="UTF-8" mimeType="application/xml"
+                doc:name="Set original message to the failure queue"></set-payload>
+            <wmq:outbound-endpoint queue="${wmq.coupa.queue.failure}" connector-ref="WMQ"
+                doc:name="Send error message to failure queue" correlationId="#[flowVars.messageId]"></wmq:outbound-endpoint>
                 <logger message="Schema validation is disabled." level="INFO" doc:name="Validation not required"></logger>
             </otherwise>
         </choice>
