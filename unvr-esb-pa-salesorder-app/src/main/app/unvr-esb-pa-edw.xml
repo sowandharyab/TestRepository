@@ -56,7 +56,7 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
         <set-variable variableName="schemaLocation" value="${xml.schema.location.cases-orderHistory}" doc:name="Variable"/>
 
         <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
-        <logger message="Passed schema validation...before calling SA : #[payload]" level="INFO" doc:name="Logger"/>
+        <logger message="Passed schema validation...before calling added by sowndharya : #[payload]" level="INFO" doc:name="Logger"/>
         <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
         <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.cases.order-so}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.1"/>
 
