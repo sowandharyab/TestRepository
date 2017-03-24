@@ -81,8 +81,13 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
             <response> 
                 <object-to-string-transformer/> 
             </response>
-        </https:outbound-endpoint>         
-         <object-to-string-transformer doc:name="Object to String"/>
+        </https:outbound-endpoint>       
+	    <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.dcs.order.search}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.1">
+            <response> 
+                <object-to-string-transformer/> 
+            </response>
+        </https:outbound-endpoint>    
+         <object-to-string-transformer doc:name="t to String"/>
         <logger message="Response from DCS: #[payload]" level="INFO" doc:name="Logger"/>
 
         <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
