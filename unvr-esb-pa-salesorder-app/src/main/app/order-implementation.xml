@@ -73,4 +73,6 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
             </dw:transform-message>
         </catch-exception-strategy>
     </choice-exception-strategy>
+<flow name="sample">
+</flow>
 </mule>
