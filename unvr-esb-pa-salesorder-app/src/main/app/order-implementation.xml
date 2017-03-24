@@ -7,7 +7,7 @@
 	xmlns:spring="http://www.springframework.org/schema/beans" 
 	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
 	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
-http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+ http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd http://www.mulesoft.org/schema/mule/ee/dw
 http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
 http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
 http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
@@ -21,7 +21,7 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
         <logger message="Validated xml  #[payload]" level="INFO" doc:name="Validated  xml"/>
         <logger message="Call to DCS_MQ API" level="INFO" doc:name="Call to DCS_MQ api"/>
 
-        <http:request config-ref="unvr-esb-sa-dcsmq-HTTP_Request_Configuration" path="/order" method="POST" doc:name="POST_http_dcs_mq" responseTimeout="60000">
+        <http:request config-ref="unvr-esb-sa-dcsmq-HTTP_Request_Configuration" path="/order" method="POST" set="true" doc:name="POST_http_dcs_mq" responseTimeout="60000" type="kjg">
             <http:request-builder>
                 <http:query-param paramName="client_id" value="${sa_client_Id}"/>
                 <http:query-param paramName="client_secret" value="${sa_client_secret}"/>
