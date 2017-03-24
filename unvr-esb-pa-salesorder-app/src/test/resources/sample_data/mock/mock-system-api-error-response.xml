@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CumulativeTotalResponse>
+	<Exception>
+		<ExceptionId>UNIVAR-EX-0001</ExceptionId>
+		<Description>Some generic exception occurred.</Description>
+		<Category>SystemAPI</Category>
+		<Service>System</Service>
+	</Exception>
+</CumulativeTotalResponse>

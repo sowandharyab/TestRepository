@@ -1,0 +1,333 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:db="http://www.mulesoft.org/schema/mule/db"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:https="http://www.mulesoft.org/schema/mule/https"
+	xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/db http://www.mulesoft.org/schema/mule/db/current/mule-db.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/https http://www.mulesoft.org/schema/mule/https/current/mule-https.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd">
+    <http:request-config name="HTTP_Request_Configuration1" host="${system.api.host}" port="8092" basePath="/" connectionIdleTimeout="12000000" doc:name="HTTP Request Configuration" responseTimeout="12000000"/>
+<https:connector name="HTTPS_CLIENT_TLS_v1.1" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="10000" serverSoTimeout="10000" socketSoLinger="0" doc:name="HTTP-HTTPS">
+    <spring:property name="sslType" value="TLSv1.1"/>
+	</https:connector>
+    <https:endpoint exchange-pattern="request-response" method="POST" connector-ref="" name="HTTP-DCS" address="https://unvr-esb-sa-edw-api-dev01.cloudhub.io/orderhistory/salesorder?client_id=a50033aef6454b2aa6797c2772279c8d&amp;client_secret=35b3120b1bb94d6d8D3097BC0D8CA1DA"  responseTimeout="0" doc:name="HTTP" contentType="application/xml"/>
+
+<configuration defaultResponseTimeout="1200000"  shutdownTimeout="200000" defaultTransactionTimeout="200000" doc:name="Configuration"/> 
+     <spring:beans>
+        <spring:bean id="invoiceDetailsBean" name="invoiceDetailsBean" class="com.univar.InvoiceDetails"/>
+    </spring:beans>
+      <!--<https:connector name="HTTP_HTTPS1" cookieSpec="netscape" validateConnections="true" sendBufferSize="0" receiveBufferSize="0" receiveBacklog="0" clientSoTimeout="0" serverSoTimeout="0" socketSoLinger="0" doc:name="HTTP-HTTPS"/> -->
+    
+             <flow name="CasesOrderHistory">
+             
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="schemaLocation" value="${xml.schema.location.cases-orderHistory}" doc:name="Variable"/>
+
+        <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
+        <logger message="Passed Schema validation..before calling SA : #[payload]" level="INFO" doc:name="Logger"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+      
+        <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.cases.order-po}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch" connector-ref="HTTPS_CLIENT_TLS_v1.1">
+        <response> 
+                        <object-to-string-transformer/> 
+                    </response>
+                    </https:outbound-endpoint>
+
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+
+
+    </flow>
+    
+      <flow name="CasesOrderHistoryDetail">
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="schemaLocation" value="${xml.schema.location.cases-orderHistory}" doc:name="Variable"/>
+
+        <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
+        <logger message="Passed schema validation...before calling SA : #[payload]" level="INFO" doc:name="Logger"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.cases.order-so}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.1"/>
+
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="DCS_Order_Lookup_Flow">
+        <logger level="INFO" doc:name="Logger" message="Calling DCS : #[payload]"/>
+        <set-variable variableName="http.disable.status.code.exception.check"              value="true" doc:name="Variable"/>
+     <!--   <http:request config-ref="HTTP_Request_Configuration" path="/status" method="POST" doc:name="Call Univar system api" requestStreamingMode="NEVER" >
+            <http:request-builder>
+                <http:query-param paramName="client_id" value=""/>
+                <http:query-param paramName="client_secret" value="4abb9391d0c6469b999CDB2C46801489"/>
+                <http:query-param paramName="responseTimeout" value="1200000"/>
+                <http:header headerName="Content-Type" value="application/xml"/>
+                <http:header headerName="Accept" value="application/xml"/>
+            </http:request-builder>
+            
+            <http:success-status-code-validator values="0..500"/>
+        </http:request> -->
+       
+         <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.dcs.order.search}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.1">
+            <response> 
+                <object-to-string-transformer/> 
+            </response>
+        </https:outbound-endpoint>         
+         <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="Response from DCS: #[payload]" level="INFO" doc:name="Logger"/>
+
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+
+    <flow name="EDW_Order_Lookup_Flow">
+        <logger message="Calling EDW: #[payload]" level="INFO" doc:name="Logger"/>
+
+        <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.order.search}" responseTimeout="12000000" contentType="application/xml" doc:name="HTTP-OrderSearch" connector-ref="HTTPS_CLIENT_TLS_v1.1" keepAlive="true">
+        	<response> 
+                        <object-to-string-transformer/> 
+                    </response>
+                    </https:outbound-endpoint>
+        <logger level="INFO" doc:name="Logger" message="Response from EDW: #[payload]"/>
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="EDW_Order_Lookup_Flow_V_2.0">
+        <logger message="Calling EDW: #[payload]" level="INFO" doc:name="Logger"/>
+
+        <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.order.search.v2.0}" responseTimeout="12000000" contentType="application/xml" doc:name="HTTP-OrderSearch" connector-ref="HTTPS_CLIENT_TLS_v1.1" keepAlive="true">
+        	<response> 
+                        <object-to-string-transformer/> 
+                    </response>
+                    </https:outbound-endpoint>
+        <logger level="INFO" doc:name="Logger" message="Response from EDW: #[payload]"/>
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="OrderHistory">
+        <object-to-string-transformer doc:name="Object to String" encoding="UTF-8"/>
+        <set-variable variableName="schemaLocation" value="${xml.schema.location.orderHistory}" doc:name="Set Schema Location"/>
+        <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="status" value="#[xpath3(&quot;/*[local-name()='OrderRequest']/*[local-name()='Status']&quot;)]"/>
+        </message-properties-transformer>
+
+        <choice doc:name="Choice">
+            <when expression="#[flowVars.Status=='L' || flowVars.Status=='C' || flowVars.Status=='S' ||  flowVars.Status=='B']">
+                <flow-ref name="EDW_Order_Lookup_Flow" doc:name="EDW_Order_Lookup_Flow"/>
+
+            </when>
+            <when expression="#[flowVars.Status=='N' || flowVars.Status=='O' || flowVars.Status=='R' ||  flowVars.Status=='P']">
+                <flow-ref name="DCS_Order_Lookup_Flow" doc:name="DCS_Order_Lookup_Flow"/>
+
+            </when>
+
+            <otherwise>
+                <flow-ref name="SearchForAllStausFlow" doc:name="SearchForAllStausFlow"/>
+
+
+
+            </otherwise>
+        </choice>
+        <set-payload value="#[payload.replaceAll(&quot;&amp;lt;&quot;, &quot;&lt;&quot;).replaceAll(&quot;'&quot;, '&quot;').replaceAll(&quot;&amp;gt;&quot;, &quot;&gt;&quot;).toString()]" mimeType="application/xml" doc:name="Copy_of_Set Payload"/>
+        <logger message="#[payload]" level="INFO" doc:name="Log_System_Layer_Response"/>
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <sub-flow name="OrderDetails-EDW">
+        <logger message="Going to check order details in EDW...      #[payload]" level="INFO" doc:name="EDW Flow Logger"/>
+
+        <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.order.details}" responseTimeout="0" contentType="application/xml" path="?responseTimeout=#[message.inboundProperties['responseTimeout'] != null ? message.inboundProperties['responseTimeout'] : 120000]" doc:name="EDW - System API call (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.1">
+        	<response> 
+                        <object-to-string-transformer/> 
+                    </response>
+                    
+                    </https:outbound-endpoint>
+
+    </sub-flow>
+    <sub-flow name="OrderDetails-DCS">
+        <logger message="Going to check Order details in DCS ..      " level="INFO" doc:name="DCSFlow - Logger"/>
+
+      <https:outbound-endpoint exchange-pattern="request-response" method="POST"  responseTimeout="0" contentType="application/xml" doc:name="DCS - System API call " address="${system.dcs.order.details}" keepAlive="true" encoding="UTF-8" connector-ref="HTTPS_CLIENT_TLS_v1.1">
+        	<response> 
+                        <object-to-string-transformer/> 
+                    </response>
+                     
+                    </https:outbound-endpoint>
+
+    </sub-flow>
+    <sub-flow name="Orderdetails-ALL">
+        <enricher doc:name="Message Enricher" target="#[payload]">
+            <scatter-gather doc:name="Scatter-Gather">
+                <processor-chain>
+                    <flow-ref name="OrderDetails-EDW" doc:name="OrderDetails-EDW"/>
+                    <mulexml:xslt-transformer mimeType="application/xml" xsl-file="transform.xslt" maxIdleTransformers="2" maxActiveTransformers="5" doc:name="XSLT"/>
+                  
+                    <object-to-string-transformer doc:name="Object to String"/>
+                </processor-chain>
+                <processor-chain>
+                    <flow-ref name="OrderDetails-DCS" doc:name="OrderDetails-DCS"/>
+                    <mulexml:xslt-transformer mimeType="application/xml" xsl-file="transform.xslt" maxIdleTransformers="2" maxActiveTransformers="5" doc:name="XSLT"/>
+                    <object-to-string-transformer doc:name="Object to String"/>
+                </processor-chain>
+            </scatter-gather>
+        </enricher>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="EDW" value="#[payload[0]]"/>
+            <add-message-property key="DCS" value="#[payload[1]]"/>
+        </message-properties-transformer>
+
+        <set-payload value="#[flowVars.DCSl]+#[flowVars.EDW]" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger level="INFO" doc:name="Logger" message="#[payload]"/>
+        <dw:transform-message  doc:name="Transform Message" metadata:id="76b872ab-6140-4d7c-a291-cf0dc19a96f7">
+            <dw:input-variable doc:sample="string.dwl" variableName="edw_xml"/>
+            <dw:set-payload resource="classpath:final_xml.dwl"/>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String" encoding="UTF-8" mimeType="application/xml"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    
+    </sub-flow>
+    <flow name="SalesOrder">
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-variable variableName="schemaLocation" value="${xml.schema.location.orderHistory}" doc:name="Set Schema Location"/>
+        <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="Status" value="#[xpath3('//*[local-name()=\'Status\']')]"/>
+        </message-properties-transformer>
+        <choice doc:name="Choice">
+
+             <when expression="#[flowVars.Status=='O' || flowVars.Status=='P' || flowVars.Status=='N' ||  flowVars.Status=='R']">
+                <flow-ref name="OrderDetails-DCS" doc:name="OrderDetails-DCS"/>
+
+
+            </when>
+            <otherwise>
+                <flow-ref name="OrderDetails-EDW" doc:name="OrderDetails-EDW"/>
+
+
+            </otherwise>
+        </choice>
+        <set-payload value="#[payload.replaceAll(&quot;&amp;lt;&quot;, &quot;&lt;&quot;).replaceAll(&quot;'&quot;, '&quot;').replaceAll(&quot;&amp;gt;&quot;, &quot;&gt;&quot;).toString()]" mimeType="application/xml" doc:name="Set Payload"/>
+
+        <logger message="Response from System API... #[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    <flow name="SchemaValidationFlow">
+        <choice doc:name="If schema validation enabled">
+            <when expression="${xml.validation.enabled}">
+                <logger message="Schema validation payload: #[message.payloadAs(java.lang.String)]" level="INFO" doc:name="Logger"/>
+                <logger message="Schema validation xsd: #[flowVars.schemaLocation]" level="INFO" doc:name="Logger-Schema Location"/>
+                <invoke object-ref="schemaValidationBean" method="validateXML" methodArguments="#[message.payloadAs(java.lang.String)], #[flowVars.schemaLocation]" doc:name="Invoke schema validation"/>
+                <logger message="Completed schema validation" level="INFO" doc:name="Logger"/>
+            </when>
+            <otherwise>
+                <logger message="Schema validation is disabled." level="INFO" doc:name="Logger"/>
+            </otherwise>
+        </choice>
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+    
+        <choice-exception-strategy name="PASalesOrderApiCatchExceptionStrategy">
+        <catch-exception-strategy when="exception.causedBy(org.xml.sax.SAXParseException)" doc:name="Catch Exception Strategy">
+            <logger level="ERROR" doc:name="Caught org.xml.sax.SAXParseException ..."/>
+            <set-variable variableName="exceptionDetails" value="#[exception.cause.message]" doc:name="Variable"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload resource="transform-schema-validation-exception.dwl"/>
+            </dw:transform-message>
+        </catch-exception-strategy>
+        <catch-exception-strategy doc:name="Catch Exception Strategy" when="exception.causedBy(org.mule.api.MessagingException)">
+            <logger level="ERROR" doc:name="Caught general exception  ..."/>
+            <set-variable variableName="exceptionDetails" value="#[exception.cause.message]" doc:name="Variable"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload resource="transform-generic-exception.dwl"/>
+            </dw:transform-message>
+        </catch-exception-strategy>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger level="ERROR" doc:name="Caught general exception  ..."/>
+            <set-variable variableName="exceptionDetails" value="#[exception.cause.message]" doc:name="Variable"/>
+            <dw:transform-message doc:name="Transform Message">
+                <dw:set-payload resource="transform-generic-exception.dwl"/>
+            </dw:transform-message>
+        </catch-exception-strategy>
+    </choice-exception-strategy>
+
+    <sub-flow name="SearchForAllStausFlow">
+        <enricher target="#[payload]" doc:name="Message Enricher">
+            <scatter-gather doc:name="Scatter-Gather">
+                <processor-chain>
+                    <flow-ref name="EDW_Order_Lookup_Flow" doc:name="EDW_Order_Lookup_Flow"/>
+                    <mulexml:xslt-transformer mimeType="application/xml" xsl-file="transform.xslt" maxIdleTransformers="2" maxActiveTransformers="5" doc:name="XSLT"/>                   
+                    <object-to-string-transformer doc:name="Object to String"/>
+                </processor-chain>
+                <processor-chain>
+                    <flow-ref name="DCS_Order_Lookup_Flow" doc:name="DCS_Order_Lookup_Flow"/>
+
+                    <mulexml:xslt-transformer mimeType="application/xml" xsl-file="transform.xslt" maxIdleTransformers="2" maxActiveTransformers="5" doc:name="XSLT"/>
+                    <object-to-string-transformer doc:name="Object to String"/>
+                </processor-chain>
+            </scatter-gather>
+        </enricher>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="EDW" value="#[payload[0]]"/>
+            <add-message-property key="DCS" value="#[payload[1]]"/>
+        </message-properties-transformer>
+        <logger message="#[flowVars.DCS]" level="INFO" doc:name="Logger"/>
+        <set-payload value="#[flowVars.DCSl]+#[flowVars.EDW]" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message metadata:id="76b872ab-6140-4d7c-a291-cf0dc19a96f7" doc:name="Transform Message">
+            <dw:input-variable doc:sample="string.dwl" variableName="edw_xml"/>
+            <dw:set-payload resource="classpath:final_xml.dwl"/>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String" encoding="UTF-8" mimeType="application/xml"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+    </sub-flow>
+    <flow name="get-invoice-pdf-Flow">
+        <set-variable variableName="invoicenumberkey" value="#[message.inboundProperties.'http.query.params'.salesoffice]#[flowVars.invoiceNumber]" doc:name="Invoice number Key"/>
+        <logger message="invoice number key=#[flowVars.invoicenumberkey]" level="INFO" doc:name="Logger"/>
+
+        <invoke object-ref="invoiceDetailsBean" method="generateInvoiceURL" methodArguments="${osg.encrypt.passPhrase},${osg.iv.key},${osg.client.id},${osg.base.url},#[flowVars.invoicenumberkey]" doc:name="Generate Invoice PDF URL"/>
+        <logger level="INFO" doc:name="Logger" message="PDF url = #[payload]"/>
+    </flow>
+	     <flow name="InvoiceDetails" >
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-variable variableName="salesOfficeId" value="#[xpath3(&quot;/*[local-name()='InvoiceRequest']/*[local-name()='Sales_Office_ID']/text()&quot;)]" doc:name="Variable"/>
+        <set-payload value="#[flowVars.salesOfficeId]#[xpath3(&quot;/*[local-name()='InvoiceRequest']/*[local-name()='Invoice_Number']/*[local-name()='DocumentReference']/*[local-name()='DocumentIdentifier']&quot;)]" doc:name="Set Payload"/>
+        <invoke object-ref="invoiceDetailsBean" method="generateInvoiceURL" methodArguments="${osg.encrypt.passPhrase},${osg.iv.key},${osg.client.id},${osg.base.url},#[message.payloadAs(java.lang.String)]" doc:name="Generate Invoice PDF URL"/>
+        <logger level="INFO" doc:name="Logger" message="#[payload]"/>
+        <dw:transform-message metadata:id="1aa03199-7c50-47f2-9fec-1d18730d85f5" doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/xml
+%namespace ns0 http://com.univar/data/enterprise/business/invoice/message/1.0
+---
+{
+	ns0#InvoiceResponse: {
+		ns0#ResultSet: {
+			ns0#row: {
+				ns0#OSGUrl: payload
+			}
+		}
+	}
+}]]></dw:set-payload>
+        </dw:transform-message>
+    </flow>
+  
+    <flow name="Invoice">
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <set-variable variableName="schemaLocation" value="${invoie.schema.location}" doc:name="Variable"/>
+        <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
+        <logger message="Passed schema validation...before calling SA : #[payload]" level="INFO" doc:name="Logger"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
+        <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${invoices.url}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch (Deprecated)" connector-ref="HTTPS_CLIENT_TLS_v1.1"/>
+        <object-to-string-transformer mimeType="application/xml" doc:name="Object to String"/>
+        <logger message="Response: #[payload]" level="INFO" doc:name="Logger"/>
+        <exception-strategy ref="PASalesOrderApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
+    </flow>
+</mule>
