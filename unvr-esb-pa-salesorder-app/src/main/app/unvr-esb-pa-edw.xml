@@ -35,7 +35,7 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
         <set-variable variableName="schemaLocation" value="${xml.schema.location.cases-orderHistory}" doc:name="Variable"/>
 
         <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
-        <logger message="Passed Schema validation..before calling SA : #[payload]" level="INFO" doc:name="Logger"/>
+        <logger message=" utbound-endpoint exchange-pattern="request-r : #[payload]" level="INFO" doc:name="Logger"/>
         <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
       
         <https:outbound-endpoint exchange-pattern="request-response" method="POST" address="${system.api.cases.order-po}" responseTimeout="1200000" contentType="application/xml" doc:name="HTTP-OrderSearch" connector-ref="HTTPS_CLIENT_TLS_v1.1">
@@ -54,7 +54,8 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
 
         <logger message="#[payload]" level="INFO" doc:name="Logger"/>
         <set-variable variableName="schemaLocation" value="${xml.schema.location.cases-orderHistory}" doc:name="Variable"/>
-
+	"Passed schema validation...before calling SA : #[payload]" level="INFO" doc:name="Logger"/>
+        <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
         <flow-ref name="SchemaValidationFlow" doc:name="SchemaValidationFlow"/>
         <logger message="Passed schema validation...before calling SA : #[payload]" level="INFO" doc:name="Logger"/>
         <mulexml:dom-to-xml-transformer doc:name="DOM to XML"/>
@@ -73,7 +74,14 @@ http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/
                 <http:header headerName="Content-Type" value="application/xml"/>
                 <http:header headerName="Accept" value="application/xml"/>
             </http:request-builder>
-            
+            tp:request config-ref="HTTP_Request_Configuration" path="/status" method="POST" doc:name="Call Univar system api" requestStreamingMode="NEVER" >
+            <http:request-builder>
+                <http:query-param paramName="client_id" value=""/>
+                <http:query-param paramName="client_secret" value="4abb9391d0c6469b999CDB2C46801489"/>
+                <http:query-param paramName="responseTimeout" value="1200000"/>
+                <http:header headerName="Content-Type" value="application/xml"/>
+                <http:header headerName="Accept" value="application/xml"/>
+            </http:request-builder>
             <http:success-status-code-validator values="0..500"/>
         </http:request> -->
        
