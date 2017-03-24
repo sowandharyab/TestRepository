@@ -43,10 +43,7 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
             <otherwise>
 <set-payload value="#[flowVars.originalMessage]" encoding="UTF-8" mimeType="application/xml"
                 doc:name="Set original message to the failure queue"></set-payload>
-            <wmq:outbound-endpoint queue="${wmq.coupa.queue.failure}" connector-ref="WMQ"
-                doc:name="Send error message to failure queue" correlationId="#[flowVars.messageId]"></wmq:outbound-endpoint>
-                <logger message="failure in qyieyrtj." level="INFO" doc:name="sgjrtdsdbnbsad"></logger>
-            </otherwise>
+            
         </choice>
         </sub-flow>
 <flow name="testflow">
