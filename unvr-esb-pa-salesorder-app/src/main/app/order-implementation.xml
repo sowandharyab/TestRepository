@@ -25,16 +25,12 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
             <http:request-builder>
                 <http:query-param paramName="client_id" value="${sa_client_Id}"/>
                 <http:query-param paramName="client_secret" value="${sa_client_secret}"/>
-
-
-
-
             </http:request-builder>
         </http:request>
         <exception-strategy ref="SalesOrderCoupaApiCatchExceptionStrategy" doc:name="Reference Exception Strategy"/>
         
     </flow>
-    <sub-flow name="SchemaValidationflow">
+    <sub-flow name="SchemaValidationsubflow">
     <choice doc:name="If Schema validation enabled">
             <when expression="${xml.validation.enabled} == true">
                 <logger message="Schema validation xsd: ${xml.schema.location}" level="INFO" doc:name="Schema validation"/>
@@ -47,6 +43,8 @@ http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/cor
             </otherwise>
         </choice>
         </sub-flow>
+<flow name="testflow">
+</flow>
      <choice-exception-strategy name="SalesOrderCoupaApiCatchExceptionStrategy">
         <catch-exception-strategy when="exception.causedBy(org.xml.sax.SAXParseException)" doc:name="Catch Exception Strategy">
             <logger level="ERROR" message="Caught org.xml.sax.SAXParseException. Pushing message to ${wmq.queue.failure} Queue." 
