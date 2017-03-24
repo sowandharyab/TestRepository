@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<CumulativeTotalRequest>
+  <CorpCode>01</CorpCode>
+  <CustAROfficeCode>01</CustAROfficeCode>
+  <CustomerNumber>116368</CustomerNumber>
+  <CustomerShipToSuffix>001</CustomerShipToSuffix>
+  <OrderEntryStartDate>2015-01-01</OrderEntryStartDate>
+  <OrderEntryEndDate>2015-12-03</OrderEntryEndDate>
+</CumulativeTotalRequest>
