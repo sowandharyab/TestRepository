@@ -1,0 +1,89 @@
+<?xml version="1.0" encoding="UTF-8"?><xs:schema targetNamespace="http://webserviceclasses/" version="1.0" xmlns:tns="http://webserviceclasses/" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <xs:element name="Exception" type="tns:Exception"/>
+
+  <xs:element name="getNestedBeanNames" type="tns:getNestedBeanNames"/>
+
+  <xs:element name="getNestedBeanNamesResponse" type="tns:getNestedBeanNamesResponse"/>
+
+  <xs:element name="sPARKSOMProcessWS" type="tns:sPARKSOMProcessWS"/>
+
+  <xs:element name="sPARKSOMProcessWSResponse" type="tns:sPARKSOMProcessWSResponse"/>
+
+  <xs:complexType name="getNestedBeanNames">
+    <xs:sequence/>
+  </xs:complexType>
+
+  <xs:complexType name="getNestedBeanNamesResponse">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="return" nillable="true" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sPARKSOMProcessWS">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="arg0" type="tns:sparksomInputProperties"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sparksomInputProperties">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="application" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubAccessHandle" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubConnectionOverrides" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubLinkKey" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStartPoolName" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStyleSheet" type="xs:string"/>
+      <xs:element minOccurs="0" name="lineItemQuantity" type="xs:string"/>
+      <xs:element minOccurs="0" name="password" type="xs:string"/>
+      <xs:element minOccurs="0" name="planShipDate" type="xs:string"/>
+      <xs:element minOccurs="0" name="salesOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="salesOrder" type="xs:string"/>
+      <xs:element minOccurs="0" name="userId" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sPARKSOMProcessWSResponse">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="return" type="tns:sparksomOutputProperties"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sparksomOutputProperties">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="application" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubAccessHandle" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubBeanName" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubBeanType" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubConnectionOverrides" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubEndChainName" type="xs:string"/>
+      <xs:element name="HPubEndType" type="xs:int"/>
+      <xs:element minOccurs="0" name="HPubErrorMessage" type="xs:string"/>
+      <xs:element name="HPubErrorOccurred" type="xs:int"/>
+      <xs:element minOccurs="0" name="HPubLinkKey" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubMacroMessage" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubOutputParmSuffix" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubScreenState" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStartChainName" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStartPoolName" type="xs:string"/>
+      <xs:element name="HPubStartType" type="xs:int"/>
+      <xs:element minOccurs="0" name="HPubStyleSheet" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubXMLData" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubXMLProperties" type="xs:string"/>
+      <xs:element minOccurs="0" name="lineItemQuantity" type="xs:string"/>
+      <xs:element minOccurs="0" name="password" type="xs:string"/>
+      <xs:element minOccurs="0" name="planShipDate" type="xs:string"/>
+      <xs:element minOccurs="0" name="salesOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="salesOrder" type="xs:string"/>
+      <xs:element minOccurs="0" name="screenError" type="xs:string"/>
+      <xs:element minOccurs="0" name="screenName" type="xs:string"/>
+      <xs:element minOccurs="0" name="userId" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Exception">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="message" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

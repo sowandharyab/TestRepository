@@ -1,0 +1,100 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule
+  xmlns:api-platform-gw="http://www.mulesoft.org/schema/mule/api-platform-gw"
+  xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit"
+  xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" 
+  xmlns:expression-language="http://www.mulesoft.org/schema/mule/expression-language-gw"
+  xmlns:http="http://www.mulesoft.org/schema/mule/http"
+  xmlns:spring="http://www.springframework.org/schema/beans" 
+  xmlns:tls="http://www.mulesoft.org/schema/mule/tls" 
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns="http://www.mulesoft.org/schema/mule/core"
+  xsi:schemaLocation=
+  "
+    http://www.mulesoft.org/schema/mule/api-platform-gw 
+    http://www.mulesoft.org/schema/mule/api-platform-gw/current/mule-api-platform-gw.xsd
+    http://www.mulesoft.org/schema/mule/apikit 
+    http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+    http://www.mulesoft.org/schema/mule/core 
+    http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+    http://www.mulesoft.org/schema/mule/expression-language-gw 
+    http://www.mulesoft.org/schema/mule/expression-language-gw/current/mule-expression-language-gw.xsd
+    http://www.mulesoft.org/schema/mule/http 
+    http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+    http://www.mulesoft.org/schema/mule/tls 
+    http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+    http://www.springframework.org/schema/beans 
+    http://www.springframework.org/schema/beans/spring-beans-current.xsd
+  "
+>
+
+    <configuration defaultProcessingStrategy="non-blocking" doc:name="Configuration"/>
+
+    <expression-language:property-placeholder location="config.properties" />
+    
+    <http:listener-config name="https" host="0.0.0.0" port="8082" protocol="HTTPS" doc:name="HTTP Listener Configuration">
+        <tls:context>
+            <tls:key-store type="jks" path="keystore-api-${environment}.jks" alias="api-mule-worker-internal" keyPassword="${ssl.jks.keypass}" password="${ssl.jks.storepass}"/>
+        </tls:context>
+    </http:listener-config>
+
+    <http:request-config
+      name="http-request-config"
+      host="![p['implementation.host']]"
+      port="![p['implementation.port']]"
+      basePath="![p['implementation.path']]"
+      protocol="HTTPS" doc:name="HTTP Request Configuration">
+        <tls:context>
+            <tls:trust-store path="truststore-app-${environment}.jks" password="${ssl.jks.storepass}" type="jks"/>
+        </tls:context>
+    </http:request-config>
+
+    <apikit:proxy-config name="proxy-config" raml="![p['raml.location']]" disableValidations="true"/>
+
+    <api-platform-gw:api id="![p['api.id']]" apiName="![p['api.name']]" version="![p['api.version']]" flowRef="proxy" doc:name="API Autodiscovery">
+    </api-platform-gw:api>
+
+    <flow name="proxy">
+        <http:listener config-ref="https" path="![p['proxy.path']]" parseRequest="false" doc:name="HTTP"/>
+
+        <flow-ref name="copy-headers" doc:name="Flow Reference"/>
+
+        <apikit:proxy config-ref="proxy-config"/>
+
+        <http:request config-ref="http-request-config" method="#[message.inboundProperties['http.method']]" path="#[message.inboundProperties['http.request.path'].substring(message.inboundProperties['http.listener.path'].length()-2)]" parseResponse="false" doc:name="HTTP">
+            <http:request-builder>
+                <http:query-params expression="#[message.inboundProperties['http.query.params']]"/>
+            </http:request-builder>
+            <http:success-status-code-validator values="0..599" />
+        </http:request>
+
+        <flow-ref name="copy-headers" doc:name="Flow Reference"/>
+
+        <exception-strategy ref="defaultExceptionStrategy"/>
+        
+    </flow>
+
+    <sub-flow name="copy-headers">
+        <custom-transformer class="com.mulesoft.gateway.extension.CopyHeadersTransformer" doc:name="Java"/>
+        <!-- This can be uncommented for customization
+            <copy-properties propertyName="*"/>
+            <remove-property propertyName="Host"/>
+            <remove-property propertyName="Content-Length"/>
+            <remove-property propertyName="MULE_*"/>
+            <remove-property propertyName="Connection"/>
+            <remove-property propertyName="Transfer-Encoding"/>
+            <remove-property propertyName="Server"/>
+        -->
+    </sub-flow>
+
+    <apikit:mapping-exception-strategy name="defaultExceptionStrategy">
+        <apikit:mapping statusCode="404">
+            <apikit:exception value="org.mule.module.apikit.exception.NotFoundException"/>
+            <set-payload value="resource not found"/>
+        </apikit:mapping>
+        <apikit:mapping statusCode="405">
+            <apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException"/>
+            <set-payload value="method not allowed"/>
+        </apikit:mapping>
+    </apikit:mapping-exception-strategy>
+</mule>

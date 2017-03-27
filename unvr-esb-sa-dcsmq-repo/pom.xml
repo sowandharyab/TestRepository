@@ -1,0 +1,303 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+
+	<modelVersion>4.0.0</modelVersion>
+	<groupId>com.univar</groupId>
+	<artifactId>unvr-esb-sa-dcsmq</artifactId>
+    <version>1.0.0-SNAPSHOT</version> 
+    <!-- <version>${app.version}</version> -->
+    <packaging>pom</packaging>
+	<name>DCS MQ - Parent Project</name>
+	<description></description>
+
+    <properties>
+    	<app.version>1.0.0-SNAPSHOT</app.version>	
+		<project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
+		<project.reporting.outputEncoding>UTF-8</project.reporting.outputEncoding>
+		<mule.version>3.7.3</mule.version>
+    	<mule.tools.version>1.1</mule.tools.version>
+		<munit.version>1.0.0</munit.version>
+    	<mule.munit.support.version>3.7.0</mule.munit.support.version>
+
+    	<!-- application-type : app (Integration application)/api (API Gateway) -->
+	    <application-type>app</application-type>
+	    <mule.env>local</mule.env>
+	    <environment>local</environment>
+	    <parm.ssl.jks.keypass>${ssl.jks.keypass}</parm.ssl.jks.keypass>
+	    <parm.ssl.jks.storepass>${ssl.jks.storepass}</parm.ssl.jks.storepass>
+	    <parm.vault.key>${vault.key}</parm.vault.key>
+        <parm.apigateway.version>API Gateway 2.1.0</parm.apigateway.version>
+        <parm.app.base.name>unvr-esb-sa-dcsmq</parm.app.base.name>
+
+        <!-- parameters for clouhub API platform -->
+        <parm.anypoint.platform.analytics_base_uri>${anypoint.platform.analytics_base_uri}</parm.anypoint.platform.analytics_base_uri>
+        <parm.anypoint.platform.coreservice_base_uri>${anypoint.platform.coreservice_base_uri}</parm.anypoint.platform.coreservice_base_uri>
+        <parm.anypoint.platform.platform_base_uri>${anypoint.platform.platform_base_uri}</parm.anypoint.platform.platform_base_uri>
+        <parm.anypoint.platform.client_id>${anypoint.platform.client_id}</parm.anypoint.platform.client_id>
+        <parm.anypoint.platform.client_secret>${anypoint.platform.client_secret}</parm.anypoint.platform.client_secret>
+
+    </properties>
+
+    <modules>
+        <module>unvr-esb-sa-dcsmq-app</module>
+        <module>unvr-esb-sa-dcsmq-api</module>
+    </modules>
+
+	<!-- UNIVAR customized config : Nexus Repositories -->
+    <distributionManagement>
+        <repository>
+            <id>nexus-releases</id>
+            <name>Internal Releases</name>
+            <url>http://nexusrepo.univar.com:8081/nexus/content/repositories/releases/</url>
+        </repository>
+        <snapshotRepository>
+            <id>nexus-snapshots</id>
+            <name>Snapshot Releases</name>
+            <url>http://nexusrepo.univar.com:8081/nexus/content/repositories/snapshots/</url>
+        </snapshotRepository>
+    </distributionManagement>
+
+    <build>
+        <pluginManagement>
+            <plugins>
+                <plugin>
+                    <groupId>org.apache.maven.plugins</groupId>
+                    <artifactId>maven-compiler-plugin</artifactId>
+<!--                     <configuration>
+                        <source>1.5</source>
+                        <target>1.5</target>
+                    </configuration> -->
+                </plugin>
+            </plugins>
+        </pluginManagement>
+    </build>
+
+	<!-- Mule Dependencies -->
+	<dependencies>
+		<!-- Xml configuration -->
+		<dependency>
+        	<groupId>com.mulesoft.muleesb</groupId>
+			<artifactId>mule-core-ee</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- Xml configuration -->
+		<dependency>
+			<groupId>com.mulesoft.muleesb.modules</groupId>
+			<artifactId>mule-module-spring-config-ee</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- Mule Transports -->
+		<dependency>
+			<groupId>org.mule.transports</groupId>
+			<artifactId>mule-transport-file</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.transports</groupId>
+			<artifactId>mule-transport-http</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+        	<groupId>com.mulesoft.muleesb.transports</groupId>
+			<artifactId>mule-transport-jdbc-ee</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+        	<groupId>com.mulesoft.muleesb.transports</groupId>
+			<artifactId>mule-transport-jms-ee</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.transports</groupId>
+			<artifactId>mule-transport-vm</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- Mule Modules -->
+		<dependency>
+			<groupId>com.mulesoft.muleesb.modules</groupId>
+			<artifactId>mule-module-data-mapper</artifactId>
+			<version>${mule.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-module-scripting</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-module-xml</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.mulesoft.weave</groupId>
+			<artifactId>mule-plugin-weave_2.11</artifactId>
+			<version>${mule.version}</version>
+			<scope>provided</scope>
+		</dependency>
+		<!-- for testing -->
+		<dependency>
+			<groupId>org.mule.tests</groupId>
+			<artifactId>mule-tests-functional</artifactId>
+			<version>${mule.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>com.cloveretl</groupId>
+			<artifactId>cloveretl-engine</artifactId>
+			<version>${mule.version}</version>
+			<scope>test</scope>
+		</dependency>
+		<dependency>
+			<groupId>xalan</groupId>
+			<artifactId>xalan</artifactId>
+			<version>2.7.1</version>
+			<scope>test</scope>
+		</dependency>
+				<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-module-apikit</artifactId>
+			<version>1.7.1</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-module-sfdc</artifactId>
+			<version>6.2.3</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-module-ldap</artifactId>
+			<version>1.3.1</version>
+		</dependency>
+		<dependency>
+            <groupId>org.mule.modules</groupId>
+            <artifactId>mule-module-spring-config</artifactId>
+            <version>${mule.version}</version>
+            <scope>provided</scope>
+        </dependency>
+    	<dependency>
+            <groupId>org.mule.modules</groupId>
+            <artifactId>mule-module-http</artifactId>
+            <version>${mule.version}</version>
+            <scope>provided</scope>
+        </dependency>
+        <!-- for deploy to cloudhub -->
+    	<dependency>
+  			<groupId>org.mule.tools.maven</groupId>
+  			<artifactId>cloudhub-maven-plugin</artifactId>
+  			<version>1.0</version>
+		</dependency>
+    	<dependency>
+            <groupId>com.mulesoft.munit</groupId>
+            <artifactId>mule-munit-support</artifactId>
+            <version>${mule.munit.support.version}</version>
+            <scope>test</scope>
+    	</dependency>
+    	<dependency>
+            <groupId>com.mulesoft.munit</groupId>
+            <artifactId>munit-runner</artifactId>
+            <version>${munit.version}</version>
+            <scope>test</scope>
+        </dependency>
+        		<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-module-extensions-support</artifactId>
+			<version>${mule.version}</version>
+		</dependency>
+		<dependency>
+			<groupId>org.mule.modules</groupId>
+			<artifactId>mule-module-extensions-spring-support</artifactId>
+			<version>${mule.version}</version>
+		</dependency>
+
+        <dependency>
+			<groupId>org.codehaus.groovy</groupId>
+			<artifactId>groovy-all</artifactId>
+			<version>2.3.7</version>
+			<scope>provided</scope>
+		</dependency>
+        <dependency>
+         	<groupId>com.ibm.dhbcore</groupId>
+         	<artifactId>dhbcore</artifactId>
+         	<version>1</version>
+        </dependency>    
+        <dependency>
+         	<groupId>com.ibm.mq.jmqi</groupId>
+         	<artifactId>jmqi</artifactId>
+         	<version>1</version>
+       	</dependency>
+       	<dependency>
+         	<groupId>com.ibm.mq</groupId>
+         	<artifactId>mq</artifactId>
+         	<version>1</version>
+       	</dependency>
+       	<dependency>
+         	<groupId>com.ibm.mqetclient</groupId>
+         	<artifactId>mqetclient</artifactId>
+         	<version>1</version>
+       	</dependency>
+       	<dependency>
+         	<groupId>com.ibm.mqjms</groupId>
+         	<artifactId>mqjms</artifactId>
+         	<version>1</version>
+       	</dependency>
+       	<dependency>
+            <groupId>org.mule.modules</groupId>
+            <artifactId>mule-module-json</artifactId>
+            <version>${mule.version}</version>
+            <scope>provided</scope>
+        </dependency>	
+        <dependency>
+			<groupId>com.mulesoft.security</groupId>
+			<artifactId>mule-module-security-property-placeholder</artifactId>
+			<version>1.5.1</version>
+		</dependency>	
+    </dependencies>
+
+	<repositories>
+          <repository>
+            <id>Central</id>
+            <name>Central</name>
+            <url>http://repo1.maven.org/maven2/</url>
+            <layout>default</layout>
+        </repository>
+        <repository>
+            <id>mulesoft-releases</id>
+            <name>MuleSoft Releases Repository</name>
+            <url>http://repository.mulesoft.org/releases/</url>
+            <layout>default</layout>
+        </repository>
+        <repository>
+            <id>mulesoft-snapshots</id>
+            <name>MuleSoft Snapshots Repository</name>
+            <url>http://repository.mulesoft.org/snapshots/</url>
+            <layout>default</layout>
+        </repository>
+		<repository>
+			<id>mule-ee-releases</id>
+			<name>MuleSoft Repository</name>
+			<url>https://repository-master.mulesoft.org/releases/</url>
+		</repository>
+    </repositories>
+
+    <pluginRepositories>
+        <pluginRepository>
+            <id>mulesoft-release</id>
+            <name>mulesoft release repository</name>
+            <layout>default</layout>
+            <url>http://repository.mulesoft.org/releases/</url>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+        </pluginRepository>
+    </pluginRepositories>
+
+</project>

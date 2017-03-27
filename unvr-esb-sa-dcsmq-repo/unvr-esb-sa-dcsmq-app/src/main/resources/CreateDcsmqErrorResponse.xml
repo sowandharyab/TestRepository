@@ -1,0 +1,11 @@
+<Rules:CreateCoupaCanonicalResponse
+    xmlns = "http://com.univar/data/enterprise/core/exception/1.0"
+    xmlns:xsi = "http://www.w3.org/2001/XMLSchema-instance"
+    xmlns:typ = "http://com.univar/data/enterprise/core/types/1.3"
+    xmlns:Rules = "http://com.univar/data/enterprise/business/rules/messages/1.0">
+    <Rules:ResponseStatus>
+        
+        <typ:Status>#[flowVars.responseStatus]</typ:Status>
+        <typ:StatusMessage>#[flowVars.responseMessage]</typ:StatusMessage>
+    </Rules:ResponseStatus>
+</Rules:CreateCoupaCanonicalResponse>

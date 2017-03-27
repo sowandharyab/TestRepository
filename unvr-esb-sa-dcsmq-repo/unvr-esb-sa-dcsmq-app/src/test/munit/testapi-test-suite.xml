@@ -1,0 +1,56 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:munit="http://www.mulesoft.org/schema/mule/munit" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:core="http://www.mulesoft.org/schema/mule/core" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="http://www.mulesoft.org/schema/mule/munit http://www.mulesoft.org/schema/mule/munit/current/mule-munit.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/secure-property-placeholder http://www.mulesoft.org/schema/mule/secure-property-placeholder/current/mule-secure-property-placeholder.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <secure-property-placeholder:config name="Secure_Property_Placehold" encryptionAlgorithm="Blowfish" key="${vault.key}" location="${environment}.properties,common.properties" ignoreResourceNotFound="true" doc:name="Secure Property Placeholder"/>
+    <munit:config mock-connectors="false" mock-inbounds="false" name="munit" doc:name="MUnit configuration"/>
+    <spring:beans>
+        <spring:import resource="classpath:testapi.xml"/>
+        <spring:import resource="classpath:test.xml"/>
+        <spring:import resource="classpath:MQ-Salesforce1.xml"/>
+        <spring:import resource="classpath:exception_handling.xml"/>
+    </spring:beans>
+    <http:request-config name="HTTP_Request_Config" protocol="HTTPS" host="localhost" port="8092" basePath="/api/" responseTimeout="300000" doc:name="HTTP Request Configuration">
+        <tls:context>
+            <tls:trust-store path="truststore-app-${environment}.jks" password="${ssl.jks.storepass}" type="jks"/>
+            <tls:key-store type="jks" path="keystore-app-${environment}.jks" alias="app-mule-worker-internal" keyPassword="${ssl.jks.keypass}" password="${ssl.jks.storepass}"/>
+        </tls:context>
+    </http:request-config>
+    <munit:test name="CreateCustomer" description="Test">
+        <parse-template location="D:\Users\10025887\Documents\univar\testdata\Prospect.xml" doc:name="Parse Template"/>
+        <http:request config-ref="HTTP_Request_Config" path="/customer/Customer" method="POST" doc:name="HTTPReq">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/xml"/>
+            </http:request-builder>
+        </http:request>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <munit:assert-true message="OOPS! HTTP RESPONSE MESSAGE WRONG" condition="#[message.inboundProperties.'http.status'==200]" doc:name="Assert True:check http status code"/>
+        <munit:assert-not-null message="no payload!" doc:name="Assert Not Null Payload"/>
+    </munit:test>
+    <munit:test name="ShipToUpdate" description="Test">
+    	<parse-template location="D:\Users\10025887\Documents\univar\testdata\Prospect.xml" doc:name="Parse Template"/>
+        <http:request config-ref="HTTP_Request_Config" path="/customer/ShipTo" method="PUT" doc:name="HTTPReq">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/xml"/>
+            </http:request-builder>
+        </http:request>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <munit:assert-true message="OOPS! HTTP RESPONSE MESSAGE WRONG" condition="#[message.inboundProperties.'http.status'==200]" doc:name="Assert True:check http status code"/>
+        <munit:assert-not-null message="no payload!" doc:name="Assert Not Null Payload"/>
+    </munit:test>
+    <munit:test name="ShipToCreate" description="Test">
+    	<parse-template location="D:\Users\10025887\Documents\univar\testdata\Prospect.xml" doc:name="Parse Template"/>
+        <http:request config-ref="HTTP_Request_Config" path="/customer/ShipTo" method="POST" doc:name="HTTPReq">
+            <http:request-builder>
+                <http:header headerName="Content-Type" value="application/xml"/>
+            </http:request-builder>
+        </http:request>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <munit:assert-true message="OOPS! HTTP RESPONSE MESSAGE WRONG" condition="#[message.inboundProperties.'http.status'==200]" doc:name="Assert True:check http status code"/>
+        <munit:assert-not-null message="no payload!" doc:name="Assert Not Null Payload"/>
+    </munit:test>
+</mule>

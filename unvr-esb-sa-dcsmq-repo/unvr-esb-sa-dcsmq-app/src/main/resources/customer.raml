@@ -1,0 +1,108 @@
+#%RAML 0.8
+title: SFDC
+version: v1.0
+baseUri: https://unvr-esb-sa-dcsmq-app-dev01.cloudhub.io:8092/api
+traits:
+  - client-id-required:
+      queryParameters:
+        client_id:
+          type: string
+        client_secret:
+          type: string
+
+/customer:
+  /Customer:
+    post:
+      is: [client-id-required]
+      description: Receives Request from SFDC and generated the message requried for DCS to create Customer
+      body:
+        application/xml:
+      responses:
+        200:
+          description: Response to the Create Customer creation to SFDC
+          body:
+            text/plain:
+              example : |
+                "Accepted"
+
+  /custproductcode:
+    post:
+      is: [client-id-required]
+      description: Customer Product Code Update from CloudCraze
+      body:
+        application/xml:
+             example: |
+              <CustomerProductCodeUpdate>
+                      <CorpCd>01</CorpCd>
+                      <CustAROffice>01</CustAROffice>
+                      <ShopperReferenceNumber>77010</ShopperReferenceNumber>
+                      <CustomerID>170157002</CustomerID>
+                      <CustProdItem>
+                              <VWRProductNumber>192271</VWRProductNumber>
+                              <PreviousCustomerProductCode></PreviousCustomerProductCode>
+                              <NewCustomerProductCode>S0445</NewCustomerProductCode>
+                      </CustProdItem>
+              </CustomerProductCodeUpdate>
+      responses:
+        200:
+          body:
+            application/xml:
+              example: |
+                      {
+                         "Response":{
+                            "Status":"SUCCESS/FAILED",
+                            "Exception":{
+                               "ErrorCode":"-1",
+                               "ErrorCausedBy":"java.lang.RuntimeException: runtime error",
+                               "ErrorDetails":"<exception details go here>",
+                               "Service":"<appName>",
+                               "ResourceName":"<flowName>",
+                               "MessageId":"<messageId>",
+                               "OriginalMessage":"<origMsg goes here>"
+                            }
+                         }
+                      }
+
+
+
+
+  /ShipTo:
+    post:
+      is: [client-id-required]
+      description: Receives Request from SFDC and generated the message requried for DCS to create Customer Ship To.
+      body:
+        application/xml:
+      responses:
+        200:
+          description: Response to the SOE Service Order creation in DCS
+          body:
+            text/plain:
+              example : |
+                "Accepted"
+    put:
+      is: [client-id-required]
+      description: Receives Request from SFDC and generated the message requried for DCS to Update Customer Ship To.
+      body:
+        application/xml:
+      responses:
+        200:
+          description: Response to the SOE Service Order creation in DCS
+          body:
+            text/plain:
+              example : |
+                "Accepted"
+
+/order:
+  post:
+    is: [client-id-required]
+    description: get purchase order for terminex
+    body:
+      application/xml:
+        example: |
+         s
+    responses:
+      200:
+        body:
+          application/xml:
+            example: |                    
+              asas

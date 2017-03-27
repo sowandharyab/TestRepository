@@ -1,0 +1,74 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="SPARKPSBWSService" targetNamespace="http://webserviceclasses/" xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:tns="http://webserviceclasses/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
+  <types>
+    <xsd:schema>
+      <xsd:import namespace="http://webserviceclasses/" schemaLocation="SPARKPSBWSService_schema1.xsd"/>
+    </xsd:schema>
+  </types>
+  <message name="getNestedBeanNamesResponse">
+    <part name="parameters" element="tns:getNestedBeanNamesResponse">
+    </part>
+  </message>
+  <message name="Exception">
+    <part name="fault" element="tns:Exception">
+    </part>
+  </message>
+  <message name="sPARKPSBProcessWS">
+    <part name="parameters" element="tns:sPARKPSBProcessWS">
+    </part>
+  </message>
+  <message name="sPARKPSBProcessWSResponse">
+    <part name="parameters" element="tns:sPARKPSBProcessWSResponse">
+    </part>
+  </message>
+  <message name="getNestedBeanNames">
+    <part name="parameters" element="tns:getNestedBeanNames">
+    </part>
+  </message>
+  <portType name="SPARKPSBWSDelegate">
+    <operation name="sPARKPSBProcessWS">
+      <input message="tns:sPARKPSBProcessWS">
+    </input>
+      <output message="tns:sPARKPSBProcessWSResponse">
+    </output>
+      <fault name="Exception" message="tns:Exception">
+    </fault>
+    </operation>
+    <operation name="getNestedBeanNames">
+      <input message="tns:getNestedBeanNames">
+    </input>
+      <output message="tns:getNestedBeanNamesResponse">
+    </output>
+    </operation>
+  </portType>
+  <binding name="SPARKPSBWSPortBinding" type="tns:SPARKPSBWSDelegate">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="sPARKPSBProcessWS">
+      <soap:operation soapAction=""/>
+      <input>
+        <soap:body use="literal"/>
+      </input>
+      <output>
+        <soap:body use="literal"/>
+      </output>
+      <fault name="Exception">
+        <soap:fault name="Exception" use="literal"/>
+      </fault>
+    </operation>
+    <operation name="getNestedBeanNames">
+      <soap:operation soapAction=""/>
+      <input>
+        <soap:body use="literal"/>
+      </input>
+      <output>
+        <soap:body use="literal"/>
+      </output>
+    </operation>
+  </binding>
+  <service name="SPARKPSBWSService">
+    <port name="SPARKPSBWSPort" binding="tns:SPARKPSBWSPortBinding">
+      <soap:address location="http://ltv-sea-hatsws1.chemd.net:80/Spark_SOE_Sales_Order_Entry/SPARKPSBWSService"/>
+
+    </port>
+  </service>
+</definitions>

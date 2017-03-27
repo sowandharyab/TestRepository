@@ -1,0 +1,219 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:http="http://www.mulesoft.org/schema/mule/http"
+	xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:ws="http://www.mulesoft.org/schema/mule/ws" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting"
+	xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:bti="http://www.mulesoft.org/schema/mule/ee/bti"
+	xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:jbossts="http://www.mulesoft.org/schema/mule/jbossts" xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.mulesoft.org/schema/mule/ee/bti http://www.mulesoft.org/schema/mule/ee/bti/current/mule-bti-ee.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
+http://www.mulesoft.org/schema/mule/jbossts http://www.mulesoft.org/schema/mule/jbossts/current/mule-jbossts.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <spring:beans>
+        <spring:bean id="wmqConnectionFactory" class="com.ibm.mq.jms.MQXAQueueConnectionFactory"> 
+            <spring:property name="transportType" value="1"/>
+            <spring:property name="queueManager" value="${wmq.queueManger}"/>
+            <spring:property name="hostName" value="${wmq.serverAddress}"/>
+            <spring:property name="channel" value="${wmq.channel}"/>
+            <spring:property name="port" value="${wmq.serverPort}"/>
+            <spring:property name="useConnectionPooling" value="true"/>
+        </spring:bean>
+    </spring:beans>
+<spring:beans>
+        <spring:bean id="mqConnectionFactoryPSB" name="wmqConnectionFactory" class="com.ibm.mq.jms.MQQueueConnectionFactory">
+            <spring:property name="transportType" value="1"/>
+            <spring:property name="queueManager" value="${wmq.queueManger}"/>
+            <spring:property name="hostName" value="${wmq.serverAddress}"/>
+            <spring:property name="port" value="${wmq.serverPort}"/>
+            <spring:property name="channel" value="${wmq.channel}"/>
+        </spring:bean>
+    </spring:beans>
+<bti:xa-caching-connection-factory 
+name="wmqConnectionFactoryPool" minPoolSize="${wmq.messaging.minPoolSize}" maxPoolSize="${wmq.messaging.maxPoolSize}" 
+maxIdleTime="${wmq.messaging.maxIdleTime}" connectionFactory-ref="wmqConnectionFactory" />
+
+<jms:caching-connection-factory name="mqCachingConnectionFactoryPSB" connectionFactory-ref="mqConnectionFactoryPSB" sessionCacheSize="2" username="${wmq.user}" password="${wmq.password}"/>
+ <bti:transaction-manager doc:name="Bitronix Transaction Manager"/> 
+ 
+ 	<wmq:xa-connector name="WMQXA" hostName="${wmq.serverAddress}" connectionFactory-ref="wmqConnectionFactoryPool" port="${wmq.serverPort}" queueManager="${wmq.queueManger}" channel="${wmq.channel}" username="${wmq.user}" transportType="CLIENT_MQ_TCPIP" validateConnections="true" doc:name="WMQ" specification="1.1" maxRedelivery="${wmq.maxRedelivery}" password="${wmq.password}">
+        <reconnect frequency="${wmq.reconnect.frequency}" count="${wmq.reconnect.count}"/>
+    </wmq:xa-connector>
+    <ws:consumer-config name="Web_Service_Consumer_SOE_Placeholder" wsdlLocation="SOE_Placeholder/SPARKSOEWSService.wsdl" service="SPARKSOEWSService" port="SPARKSOEWSPort" serviceAddress="${hats.soeServiceAddress}" doc:name="Web Service Consumer"/>
+    <ws:consumer-config name="Web_Service_Consumer_ph_update" wsdlLocation="ServiceOrderUpdateWSDL/SPARKSOMWSService.wsdl" service="SPARKSOMWSService" port="SPARKSOMWSPort" serviceAddress="${hats.somServiceAddress}" doc:name="Web Service Consumer"/>
+    <ws:consumer-config  name="Web_Service_Consumer_SOM_Cancel"  wsdlLocation="SalesOrderCancelWSDL/SPARKSOCWSService.wsdl" service="SPARKSOCWSService" port="SPARKSOCWSPort" serviceAddress="${hats.socServiceAddress}" doc:name="Web Service Consumer"/>
+	<ws:consumer-config name="Web_Service_Consumer_PSB" wsdlLocation="PSB/SPARKPSBWSService.wsdl" service="SPARKPSBWSService" port="SPARKPSBWSPort" serviceAddress="${hats.psbServiceAddress}" doc:name="Web Service Consumer" />
+	<configuration defaultResponseTimeout="200000" doc:name="Configuration"/>
+    <wmq:connector name="PSBQueue" validateConnections="true" doc:name="WMQ" connectionFactory-ref="mqCachingConnectionFactoryPSB" numberOfConsumers="2" channel="${wmq.channel}" hostName="${wmq.serverAddress}" password="{wmq.password}" port="${wmq.serverPort}" queueManager="${wmq.queueManger}" transportType="CLIENT_MQ_TCPIP" username="${wmq.user}" specification="1.1" persistentDelivery="true">
+        <reconnect frequency="${wmq.reconnect.frequency}" count="${wmq.reconnect.count}"/>
+    </wmq:connector>
+		    
+	<flow name="MQ-HATS-SOE-Flow">
+		<wmq:inbound-endpoint queue="${wmq.hats.soe.requestqueue}" connector-ref="WMQXA" doc:name="HATS SOE Request Q">
+            <xa-transaction action="ALWAYS_BEGIN"/>
+        </wmq:inbound-endpoint>
+        <set-variable variableName="SOEpayload" value="#[payload]" doc:name="SOEpayload"/>
+        <dw:transform-message metadata:id="32e49431-4017-47c6-8245-f8203ba4b780" doc:name="Transform Message">
+        <dw:input-payload mimeType="text/xml"/>
+            <dw:set-payload resource="transform/SOEpayload.dwl"></dw:set-payload>
+            <dw:set-variable resource="classpath:transform/SOESFOrderId.dwl" variableName="SFOrderId"/>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="SOE payload logger = #[payload]" level="INFO" doc:name="Logger"/>
+        <set-payload value="#[flowVars.SOEpayload]" doc:name="SOE Payload"/>
+        <ws:consumer config-ref="Web_Service_Consumer_SOE_Placeholder" operation="sPARKSOEProcessWS" doc:name="Web Service Consumer"/>
+        <dw:transform-message metadata:id="a34c0b13-ed9b-471f-a163-cd4754afcc54" doc:name="Transform Message">
+            <dw:set-payload resource="classpath:transform/SOEresponse.dwl"></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.soe.replyqueue}" connector-ref="WMQXA" doc:name="HATS SOE Reply Q" >
+            <xa-transaction action="ALWAYS_JOIN"/>
+        </wmq:outbound-endpoint>
+
+        <set-payload value="#[flowVars.SOEpayload]" doc:name="SOEpayload"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.soe.backupqueue}" connector-ref="WMQXA" doc:name="HATS SOE Backup Q" >
+            <xa-transaction action="ALWAYS_JOIN"/>
+        </wmq:outbound-endpoint>
+        <logger message="Done putting original payload into HATS SOE backup queue" level="INFO" doc:name="Logger"/>
+
+        <rollback-exception-strategy doc:name="Rollback Exception Strategy" maxRedeliveryAttempts="${wmq.maxRedelivery}">
+            <logger message="HATS SOE In roll back exception strategy" level="INFO" doc:name="Logger"/>
+            <on-redelivery-attempts-exceeded>
+                <logger message="In SOE roll back exception strategy redelivery exhausted" level="INFO" doc:name="Logger"/>
+                <set-payload value="#[flowVars.SOEpayload]" doc:name="Set Payload"/>
+
+                <wmq:outbound-endpoint queue="${wmq.hats.soe.failqueue}" connector-ref="WMQXA" doc:name="HATS SOE Fail Q" >
+                    <xa-transaction action="ALWAYS_JOIN"/>
+                </wmq:outbound-endpoint>
+                <logger message="Done putting message to SOE HATS fail queue" level="INFO" doc:name="Logger"/>
+            </on-redelivery-attempts-exceeded>
+        </rollback-exception-strategy>
+
+	</flow>
+
+	<flow name="MQ-HATS-SOM-Flow">
+		<wmq:inbound-endpoint queue="${wmq.hats.som.requestqueue}" connector-ref="WMQXA" doc:name="HATS SOM Request Q">
+            <xa-transaction action="ALWAYS_BEGIN"/>
+        </wmq:inbound-endpoint>
+        <set-variable variableName="SOMpayload" value="#[payload]" doc:name="SOMpayload"/>
+        <dw:transform-message metadata:id="2f59aa65-829d-4059-9559-36a5374afee6" doc:name="Transform Message">
+        <dw:input-payload mimeType="text/xml"/>
+            <dw:set-payload resource="transform/SOMpayload.dwl"/>
+            <dw:set-variable resource="classpath:transform/SOMSFOrderId.dwl" variableName="SFOrderId"/>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="SOM payload logger = #[payload]" level="INFO" doc:name="Logger"/>    
+        <set-payload value="#[flowVars.SOMpayload]" doc:name="SOM Payload"/>      
+        <ws:consumer config-ref="Web_Service_Consumer_ph_update" operation="sPARKSOMProcessWS" doc:name="Web Service Consumer"/>
+        <dw:transform-message metadata:id="9f192be6-dc5b-48cf-8c0d-508f07a9067d" doc:name="Transform Message">
+            <dw:set-payload resource="classpath:transform/SOMresponse.dwl"/>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.som.replyqueue}" connector-ref="WMQXA" doc:name="HATS SOM Reply Q" >
+            <xa-transaction action="ALWAYS_JOIN"/>
+        </wmq:outbound-endpoint>
+
+        <set-payload value="#[flowVars.SOMpayload]" doc:name="SOMpayload"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.som.backupqueue}" connector-ref="WMQXA" doc:name="HATS SOM Backup Q" >
+            <xa-transaction action="ALWAYS_JOIN"/>
+        </wmq:outbound-endpoint>
+        <logger message="Done putting original payload into HATS SOM backup queue" level="INFO" doc:name="Logger"/>
+         <rollback-exception-strategy doc:name="Rollback Exception Strategy" maxRedeliveryAttempts="${wmq.maxRedelivery}">
+            <logger message="HATS SOM In roll back exception strategy" level="INFO" doc:name="Logger"/>
+       
+            <on-redelivery-attempts-exceeded>
+                <logger message="In SOM roll back exception strategy redelivery exhausted" level="INFO" doc:name="Logger"/>
+                <set-payload value="#[flowVars.SOMpayload]" doc:name="Set Payload"/>
+
+                <wmq:outbound-endpoint queue="${wmq.hats.som.failqueue}" connector-ref="WMQXA" doc:name="HATS SOM Fail Q" >
+                    <xa-transaction action="ALWAYS_JOIN"/>
+                </wmq:outbound-endpoint>
+                <logger message="Done putting message to SOM HATS fail queue" level="INFO" doc:name="Logger"/>
+            </on-redelivery-attempts-exceeded>          
+        </rollback-exception-strategy>
+	</flow>
+	<flow name="MQ-HATS-SOC-Flow">
+		<wmq:inbound-endpoint queue="${wmq.hats.soc.requestqueue}" connector-ref="WMQXA" doc:name="HATS SOC Request Q">
+            <xa-transaction action="ALWAYS_BEGIN"/>
+        </wmq:inbound-endpoint>
+        <set-variable variableName="SOCpayload" value="#[payload]" doc:name="SOCpayload"/>
+        <set-variable doc:name="Store AfterPSB" value="#[xpath3('//AfterPSB')]" variableName="AfterPSB"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="08a1baed-7f46-43f9-a055-b9f237a0eb8c">
+        <dw:input-payload mimeType="text/xml"/>
+            <dw:set-payload resource="classpath:transform/SOCpayload.dwl"></dw:set-payload>
+            <dw:set-variable resource="classpath:transform/SOCSFOrderId.dwl" variableName="SFOrderId"/>
+
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="SOC payload logger = #[payload]" level="INFO" doc:name="Logger"/>    
+        <set-payload value="#[flowVars.SOCpayload]" doc:name="SOC Payload"/>      
+        <ws:consumer config-ref="Web_Service_Consumer_SOM_Cancel" operation="sPARKSOCProcessWS" doc:name="Web Service Consumer"/>
+        <dw:transform-message doc:name="Transform Message" metadata:id="92b995b3-9999-4e92-8d3f-ba1e813e5379">
+            <dw:set-payload resource="classpath:transform/SOCresponse.dwl"></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.soc.replyqueue}" connector-ref="WMQXA" doc:name="HATS SOC Reply Q" >
+            <xa-transaction action="ALWAYS_JOIN"/>
+        </wmq:outbound-endpoint>
+
+        <set-payload value="#[flowVars.SOCpayload]" doc:name="SOCpayload"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.soc.backupqueue}" connector-ref="WMQXA" doc:name="HATS SOC Backup Q" >
+            <xa-transaction action="ALWAYS_JOIN"/>
+        </wmq:outbound-endpoint>
+        <logger message="Done putting original payload into HATS SOC backup queue" level="INFO" doc:name="Logger"/>
+         <rollback-exception-strategy doc:name="Rollback Exception Strategy" maxRedeliveryAttempts="${wmq.maxRedelivery}">
+            <logger message="HATS SOC In roll back exception strategy" level="INFO" doc:name="Logger"/>
+       
+            <on-redelivery-attempts-exceeded>
+                <logger message="In SOC roll back exception strategy redelivery exhausted" level="INFO" doc:name="Logger"/>
+                <set-payload value="#[flowVars.SOCpayload]" doc:name="Set Payload"/>
+
+                <wmq:outbound-endpoint queue="${wmq.hats.soc.failqueue}" connector-ref="WMQXA" doc:name="HATS SOC Fail Q" >
+                    <xa-transaction action="ALWAYS_JOIN"/>
+                </wmq:outbound-endpoint>
+                <logger message="Done putting message to SOC HATS fail queue" level="INFO" doc:name="Logger"/>
+            </on-redelivery-attempts-exceeded>          
+        </rollback-exception-strategy>
+	</flow>	
+	<flow name="MQ-HATS-PSB-Flow">
+		<wmq:inbound-endpoint queue="${wmq.hats.psb.requestqueue}" connector-ref="PSBQueue" doc:name="HATS PSB Request Q">
+        </wmq:inbound-endpoint>
+        <set-variable variableName="PSBpayload" value="#[payload]" doc:name="PSBpayload"/>
+        <dw:transform-message metadata:id="57e38d2d-a8ea-44ca-9269-fefb435a66ea" doc:name="Transform Message">
+        <dw:input-payload mimeType="text/xml"/>
+            <dw:set-payload resource="classpath:transform/PSBpayload.dwl"/>
+            <dw:set-variable resource="classpath:transform/PSBSFOrderId.dwl" variableName="SFOrderId"/>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <logger message="PSB payload logger = #[payload]" level="INFO" doc:name="Logger"/>    
+        <set-payload value="#[flowVars.PSBpayload]" doc:name="PSB Payload"/>      
+        <ws:consumer config-ref="Web_Service_Consumer_PSB" operation="sPARKPSBProcessWS" doc:name="Web Service Consumer"/>
+        <dw:transform-message metadata:id="8b8a4fe2-2952-4f26-aaaf-23eb559e1803" doc:name="Transform Message">
+            <dw:set-payload resource="classpath:transform/PSBresponse.dwl"></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.psb.replyqueue}" connector-ref="PSBQueue" doc:name="HATS PSB Reply Q" >
+        </wmq:outbound-endpoint>
+
+        <set-payload value="#[flowVars.PSBpayload]" doc:name="PSBpayload"/>
+        <wmq:outbound-endpoint queue="${wmq.hats.psb.backupqueue}" connector-ref="PSBQueue" doc:name="HATS PSB Backup Q" >
+        </wmq:outbound-endpoint>
+        <logger message="Done putting original payload into HATS PSB backup queue" level="INFO" doc:name="Logger"/>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger message="In PSB roll back exception strategy redelivery exhausted" level="INFO" doc:name="Logger"/>
+            <set-payload value="#[flowVars.PSBpayload]" doc:name="Set Payload"/>
+            <wmq:outbound-endpoint queue="${wmq.hats.psb.failqueue}" connector-ref="PSBQueue" doc:name="HATS PSB Fail Q">
+            </wmq:outbound-endpoint>
+            <logger message="Done putting message to PSB HATS fail queue" level="INFO" doc:name="Logger"/>
+        </catch-exception-strategy>
+	</flow>		
+</mule>

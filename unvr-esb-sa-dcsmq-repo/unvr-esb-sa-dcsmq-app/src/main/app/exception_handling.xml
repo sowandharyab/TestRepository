@@ -1,0 +1,95 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc"
+	xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd">
+	<choice-exception-strategy
+		name="exception_handlingChoice_Exception_Strategy">
+		<catch-exception-strategy
+			when="#[exception.causedBy(java.net.SocketException)]" doc:name="CausedBy(java.net.SocketException) E1000">
+			<logger message="Socket exception occured : Updating status in salesforce"
+				level="INFO" doc:name="Logger" />
+			<flow-ref name="Update-to-SFDC" doc:name="Update-to-SFDC" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedExactlyBy(java.net.SocketTimeoutException)]"
+			doc:name="CausedExactlyBy(java.net.SocketTimeoutException) E1001">
+			<logger
+				message="Socket timeout exception occured : Updating status in salesforce"
+				level="INFO" doc:name="Logger" />
+			<flow-ref name="Update-to-SFDC" doc:name="Update-to-SFDC" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedExactlyBy(java.net.UnknownHostException)]"
+			doc:name="CausedExactlyBy(java.net.UnknownHostException) E1002">
+			<logger
+				message="Unknown host exception occured : Updating status in salesforce"
+				level="INFO" doc:name="Logger" />
+			<flow-ref name="Update-to-SFDC" doc:name="Update-to-SFDC" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedExactlyBy(java.lang.IllegalArgumentException)]"
+			doc:name="CausedExactlyBy(java.lang.IllegalArgumentException) E1003">
+			<logger
+				message="Invalid message structure exception occured : Updating status in salesforce"
+				level="INFO" doc:name="Logger" />
+			<flow-ref name="Update-to-SFDC" doc:name="Update-to-SFDC" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedExactlyBy(com.mulesoft.mule.module.datamapper.api.exception.DataMapperExecutionException)]"
+			doc:name="CausedExactlyBy(com.mulesoft.mule.module.datamapper.api.exception.DataMapperExecutionException) E1004">
+			<logger
+				message="Invalid message structure exception occured : Updating status in salesforce"
+				level="INFO" doc:name="Logger" />
+			<flow-ref name="Update-to-SFDC" doc:name="Update-to-SFDC" />
+		</catch-exception-strategy>
+		<catch-exception-strategy
+			when="#[exception.causedExactlyBy(org.mule.module.ws.consumer.SoapFaultException)]"
+			doc:name="CausedExactlyBy(org.mule.module.ws.consumer.SoapFaultException) E1004">
+			<logger
+				message="Invalid message structure exception occured : Updating status in salesforce"
+				level="INFO" doc:name="Logger" />
+			<flow-ref name="Update-to-SFDC" doc:name="Update-to-SFDC" />
+		</catch-exception-strategy>
+	</choice-exception-strategy>
+	<sub-flow name="Update-to-SFDC">
+		<logger message="Entering Exception" level="INFO" doc:name="Logger" />
+		<set-variable variableName="exceptionMessage" value="#[payload]"
+			doc:name="exceptionMessage" />
+		<scripting:component doc:name="Groovy">
+			<scripting:script engine="Groovy"><![CDATA[import java.util.*
+HashMap<String, Object> object = new HashMap<String, Object>()
+	if (sessionVars.sucessSFDCId != "" && sessionVars.failSFDCId != ""){
+		if (sessionVars.sucessSFDCId != ""){
+			object.put("Id", sessionVars.sucessSFDCId)
+		}
+		else {
+			object.put("Id", sessionVars.failSFDCId)
+		}
+	}
+	
+	object.put("DCS_Error_Description__c" , flowVars.exceptionMessage)
+	object.put("DCS_Error_Text__c", flowVars.exceptionMessage)
+	object.put("DCS_In_Progress__c", false)
+	object.put("Ready_For_Integration__c" , true)
+	object.put("Customer_to_DCS_Integration_DateTime__c", flowVars.DtTime)	
+	object.put("Customer_to_DCS_Integration_Status__c", "Error: Unable to submit request to DCS")
+HashMap<String, Object> payload = new HashMap<String, Object>()
+
+payload.put("object",object)
+
+return payload]]></scripting:script>
+		</scripting:component>
+		<sfdc:update-single config-ref="Salesforce__Basic_authentication"
+			type="Account" doc:name="Salesforce">
+			<sfdc:object ref="#[payload.object]" />
+		</sfdc:update-single>
+		<logger message="Exception message updated in salesforce #[payload]"
+			level="INFO" doc:name="Logger" />
+	</sub-flow>
+</mule>

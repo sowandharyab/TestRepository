@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml"
+	xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq"
+	xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw"
+	xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd">
+    <flow name="order-implementationFlow">
+    <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <logger message="Incomingb payload #[payload]" level="INFO" doc:name="Incoming payload"/>
+        <component class="com.univar.TrackingNumberGenerator" doc:name="Java getTrackingNbr"/>
+        <logger message="#[flowVars.CustomerId]" level="INFO" doc:name="Logger"/>
+        <dw:transform-message doc:name="Transform Message">
+         <dw:set-payload resource="OrderResponse.dwl"/>
+        </dw:transform-message>
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <logger message="Canonical to G4 XML #[payload]" level="INFO" doc:name="Canonical to G4 XML"/>
+        <wmq:outbound-endpoint queue="${wmq.coupa.queue}" connector-ref="WMQNonXA" doc:name="WMQ"/>
+    <choice-exception-strategy doc:name="Choice Exception Strategy">
+        <catch-exception-strategy when="exception.causedBy(org.xml.sax.SAXParseException)" doc:name="Catch Exception Strategy">
+            <logger level="ERROR" doc:name="Caught org.xml.sax.SAXParseException ..."/>
+                
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                    <add-message-property key="responseMessage" value="#['SAX Parse Exception']"/>
+                    <add-message-property key="responseStatus" value="#['Failure']"/>
+                </message-properties-transformer>
+       <parse-template location="CreateDcsmqErrorResponse.xml" doc:name="Parse Template"/>
+       <mulexml:dom-to-xml-transformer encoding="UTF-8" mimeType="application/xml" doc:name="DOM to XML" />
+        </catch-exception-strategy>
+        <catch-exception-strategy doc:name="Catch Exception Strategy">
+            <logger level="ERROR" doc:name="Caught general exception  ..."/>
+                
+            <message-properties-transformer scope="invocation" doc:name="Message Properties">
+                    <add-message-property key="responseMessage" value="#[exception.cause]"/>
+                    <add-message-property key="responseStatus" value="#['Failure']"/>
+                </message-properties-transformer>
+             <parse-template location="CreateDcsmqErrorResponse.xml" doc:name="Parse Template"/>
+             <mulexml:dom-to-xml-transformer encoding="UTF-8" mimeType="application/xml" doc:name="DOM to XML" />
+        </catch-exception-strategy>
+    </choice-exception-strategy> 
+    </flow>
+</mule>
