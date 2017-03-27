@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8"?><xs:schema xmlns:xs="http://www.w3.org/2001/XMLSchema" targetNamespace="http://webserviceclasses/" version="1.0" xmlns:tns="http://webserviceclasses/">
+
+  <xs:element name="Exception" type="tns:Exception"/>
+
+  <xs:element name="getNestedBeanNames" type="tns:getNestedBeanNames"/>
+
+  <xs:element name="getNestedBeanNamesResponse" type="tns:getNestedBeanNamesResponse"/>
+
+  <xs:element name="sPARKSOEProcessWS" type="tns:sPARKSOEProcessWS"/>
+
+  <xs:element name="sPARKSOEProcessWSResponse" type="tns:sPARKSOEProcessWSResponse"/>
+
+  <xs:complexType name="sPARKSOEProcessWS">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="arg0" type="tns:sparksoewsSPARKSOEInputProperties"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sparksoewsSPARKSOEInputProperties">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="application" type="xs:string"/>
+      <xs:element minOccurs="0" name="customerNumber" type="xs:string"/>
+      <xs:element minOccurs="0" name="customerPO" type="xs:string"/>
+      <xs:element minOccurs="0" name="customerShipTo" type="xs:string"/>
+      <xs:element minOccurs="0" name="department" type="xs:string"/>
+      <xs:element minOccurs="0" name="poOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="shipTerms" type="xs:string"/>
+      <xs:element minOccurs="0" name="shipVia" type="xs:string"/>
+      <xs:element minOccurs="0" name="soOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="storeXML" type="xs:string"/>
+      <xs:element minOccurs="0" name="user_id" type="xs:string"/>
+      <xs:element minOccurs="0" name="user_password" type="xs:string"/>
+      <xs:element minOccurs="0" name="warehouse" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sPARKSOEProcessWSResponse">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="return" type="tns:sparksoewsSPARKSOEOutputProperties"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sparksoewsSPARKSOEOutputProperties">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="allocation" type="xs:string"/>
+      <xs:element minOccurs="0" name="availability" type="xs:string"/>
+      <xs:element minOccurs="0" name="committed_quantity" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="committed_quantityx" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="credit" type="xs:string"/>
+      <xs:element minOccurs="0" name="customer_PO" type="xs:string"/>
+      <xs:element minOccurs="0" name="delivery_date" type="xs:string"/>
+      <xs:element minOccurs="0" name="direct" type="xs:string"/>
+      <xs:element minOccurs="0" name="errorItem" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="errorItemx" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="errorMessage" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="errorMessagex" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="extended_line_price" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="extended_line_pricex" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="item_number" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="item_numberx" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="line_cost" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="line_costx" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="line_price" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="line_pricex" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="messageText" type="xs:string"/>
+      <xs:element minOccurs="0" name="operator" type="xs:string"/>
+      <xs:element minOccurs="0" name="orderID" type="xs:string"/>
+      <xs:element minOccurs="0" name="order_deposits" type="xs:string"/>
+      <xs:element minOccurs="0" name="order_freight" type="xs:string"/>
+      <xs:element minOccurs="0" name="order_hold" type="xs:string"/>
+      <xs:element minOccurs="0" name="order_quantity" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="order_quantityx" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="order_tax" type="xs:string"/>
+      <xs:element minOccurs="0" name="order_total" type="xs:string"/>
+      <xs:element minOccurs="0" name="pricing_type" type="xs:string"/>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="pricing_typex" nillable="true" type="xs:string"/>
+      <xs:element minOccurs="0" name="screen_error" type="xs:string"/>
+      <xs:element minOccurs="0" name="screen_name" type="xs:string"/>
+      <xs:element minOccurs="0" name="shipType" type="xs:string"/>
+      <xs:element minOccurs="0" name="special_charges" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Exception">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="message" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="getNestedBeanNames">
+    <xs:sequence/>
+  </xs:complexType>
+
+  <xs:complexType name="getNestedBeanNamesResponse">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="return" nillable="true" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

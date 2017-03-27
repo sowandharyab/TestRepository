@@ -1,0 +1,1274 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms"
+	xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:scripting="http://www.mulesoft.org/schema/mule/scripting" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" 
+xmlns:metadata="http://www.mulesoft.org/schema/mule/metadata" 
+xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq"
+	xmlns:vm="http://www.mulesoft.org/schema/mule/vm" 
+	xmlns="http://www.mulesoft.org/schema/mule/core"
+	xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/scripting http://www.mulesoft.org/schema/mule/scripting/current/mule-scripting.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd">
+    
+    <spring:beans>
+        <spring:bean id="mqConnectionFactory" name="wmqConnectionFactory" class="com.ibm.mq.jms.MQXAQueueConnectionFactory">
+            <spring:property name="transportType" value="1"/>
+            <spring:property name="queueManager" value="${wmq.queueManger}"/>
+            <spring:property name="hostName" value="${wmq.serverAddress}"/>
+            <spring:property name="port" value="${wmq.serverPort}"/>
+            <spring:property name="channel" value="${wmq.channel}"/>
+        </spring:bean>
+    </spring:beans>
+    <jms:caching-connection-factory name="mqCachingConnectionFactory" connectionFactory-ref="mqConnectionFactory" sessionCacheSize="2" username="${wmq.user}" password="${wmq.password}"/>
+    <wmq:connector name="WMQ" validateConnections="true" doc:name="WMQ" connectionFactory-ref="mqCachingConnectionFactory" numberOfConsumers="2" channel="${wmq.channel}" hostName="${wmq.serverAddress}" password="{wmq.password}" port="${wmq.serverPort}" queueManager="${wmq.queueManger}" transportType="CLIENT_MQ_TCPIP" username="${wmq.user}" specification="1.1" persistentDelivery="true">
+        <reconnect-forever  frequency="20000" blocking="false"/>
+    </wmq:connector>
+	<spring:beans>
+        <spring:bean id="schemaValidationBean" name="schemaValidationBean" class="com.univar.SchemaValidator"/>
+    </spring:beans>
+	<flow name="unvr-esb-sa-sfdc-app_CreateCustomerFlow">
+		<vm:inbound-endpoint exchange-pattern="one-way"
+			path="Customer-Create" doc:name="VM" />
+        <flow-ref name="SetProperty" doc:name="SetProperty"/>
+ 		<flow-ref name="CreateCustomerSub_Flow" doc:name="CreateCustomerSub_Flow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <wmq:outbound-endpoint queue="${wmq.queuename}" connector-ref="WMQ" doc:name="WMQ"/>
+
+
+     	</flow>
+    <flow name="unvr-esb-sa-sfdc-app_UpdateShipToFlow">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="ShipTo-Update" doc:name="VM"/>
+        <flow-ref name="SetProperty" doc:name="SetProperty"/>
+     	<flow-ref name="UpdateShipToSub_Flow" doc:name="UpdateShipToSub_Flow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <wmq:outbound-endpoint queue="${wmq.queuename}" connector-ref="WMQ" doc:name="WMQ"/>
+        <exception-strategy ref="exception_handlingChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+    <flow name="unvr-esb-sa-sfdc-appCreateShipToFlow">
+        <vm:inbound-endpoint exchange-pattern="one-way" path="ShipTo-Create" doc:name="VM"/>
+        <flow-ref name="SetProperty" doc:name="SetProperty"/>
+     	<flow-ref name="Create-ShipToSub_Flow" doc:name="Create-ShipToSub_Flow"/>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+        <wmq:outbound-endpoint queue="${wmq.queuename}" connector-ref="WMQ" doc:name="WMQ"/>
+        <exception-strategy ref="exception_handlingChoice_Exception_Strategy" doc:name="Reference Exception Strategy"/>
+
+    </flow>
+    <sub-flow name="SetProperty">
+        <set-variable variableName="OrgPayload" value="#[payload]" doc:name="Set Original Payload"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="test1" value="#[xpath3('//PartyInformation/Employee/DCSId')]"/>
+            <add-message-property key="test2" value="#[xpath3('//PartyInformation/Local/SalesmanCode')]"/>
+        </message-properties-transformer>
+        <logger message="#[flowVars.'test1'.length() == 5]" level="INFO" doc:name="Logger"/>
+        <choice doc:name="Choice for DCSID">
+            <when expression="#[flowVars.test1.length() == 5]">
+                <message-properties-transformer scope="invocation" doc:name="EQ-5">
+                    <add-message-property key="DCSId" value="#[flowVars['test1'].substring(1,5)]"/>
+                </message-properties-transformer>
+            </when>
+            <otherwise>
+                <message-properties-transformer scope="invocation" doc:name="LT-5">
+                    <add-message-property key="DCSId" value="#[flowVars.test1]"/>
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <choice doc:name="Choice for SLMN">
+            <when expression="#[flowVars.test2.length() == 5]">
+                <message-properties-transformer scope="invocation" doc:name="EQ-5">
+                    <add-message-property key="CUST-SLSMN1-CODE" value="#[flowVars['test2'].substring(2,5)]"/>
+                </message-properties-transformer>
+            </when>
+            <otherwise>
+                <message-properties-transformer scope="invocation" doc:name="LT-5">
+                    <add-message-property key="CUST-SLSMN1-CODE" value="#[flowVars.test2]"/>
+                </message-properties-transformer>
+            </otherwise>
+        </choice>
+        <logger message="#[payload]" level="INFO" doc:name="Logger"/>
+
+       </sub-flow>
+ 	
+    <sub-flow name="CreateCustomerSub_Flow">
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+    <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+	EPAInfo: { (payload.PartyInformation.*EPAInformation map {
+        ("a$$"): {
+            EPANumber: $.EPANumber  ++ generate(' ', 12 - sizeOf $.EPANumber) when ((sizeOf $.EPANumber) > 0 ) otherwise  $.EPANumber  ++ generate('~', 12 - sizeOf $.EPANumber)  ,
+                        EPAID: $.EPAID ++ generate(' ', 2 - sizeOf $.EPAID)  when ((sizeOf $.EPAID) > 0 ) otherwise  $.EPAID  ++ generate('~', 2 - sizeOf $.EPAID)  
+        }
+    })
+    
+    }]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="FED-EPA-NUMBER" value="#[xpath3('//EPAInfo/a0/EPANumber')]"/>
+            <add-message-property key="STATE-EPA-NUMBER" value="#[xpath3('//EPAInfo/a1/EPANumber')]"/>
+            <add-message-property key="STATE-EPA-NUMBER-2" value="#[xpath3('//EPAInfo/a2/EPANumber')]"/>
+            <add-message-property key="STATE-ID-1" value="#[xpath3('//EPAInfo/a1/EPAID')]"/>
+            <add-message-property key="STATE-ID-2" value="#[xpath3('//EPAInfo/a2/EPAID')]"/>
+
+        </message-properties-transformer>
+
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+	ContactInfo: { (payload.PartyInformation.*contact map {
+        ("a$$"): {
+Type:$.Type ,
+Name:$.Name ++ generate(' ', 25 - sizeOf $.Name) when ((sizeOf $.Name) > 0 ) otherwise  $.Name  ++ generate('~', 25 - sizeOf $.Name) ,
+FirstName:$.FirstName ++ generate(' ', 25 - sizeOf $.FirstName) when ((sizeOf $.FirstName) > 0 ) otherwise  $.FirstName  ++ generate('~', 25 - sizeOf $.FirstName),
+LastName:$.LastName ++ generate(' ', 20 - sizeOf $.LastName) when ((sizeOf $.LastName) > 0 ) otherwise  $.LastName  ++ generate('~', 20 - sizeOf $.LastName),
+Fax:$.Fax ++ generate(' ', 12 - sizeOf $.Fax) when ((sizeOf $.Fax) > 0 ) otherwise  $.Fax  ++ generate('~', 12 - sizeOf $.Fax) ,
+Phone:$.Phone ++ generate(' ', 12 - sizeOf $.Phone) when ((sizeOf $.Phone) > 0 ) otherwise  $.Phone  ++ generate('~', 12 - sizeOf $.Phone),
+Prefix:$.Prefix ++ generate(' ', 15 - sizeOf $.Prefix) when ((sizeOf $.Prefix) > 0 ) otherwise  $.Prefix  ++ generate('~', 15 - sizeOf $.Prefix),
+ShortName:$.ShortName ++ generate(' ', 10 - sizeOf $.ShortName) when ((sizeOf $.ShortName) > 0 ) otherwise  $.ShortName  ++ generate('~', 10 - sizeOf $.ShortName),
+Suffix:$.Suffix ++ generate(' ', 3 - sizeOf $.Suffix) when ((sizeOf $.Suffix) > 0 ) otherwise  $.Suffix  ++ generate('~', 3 - sizeOf $.Suffix), 
+Title:$.Title ++ generate(' ', 20 - sizeOf $.Title) when ((sizeOf $.Title) > 0 ) otherwise  $.Title  ++ generate('~', 20 - sizeOf $.Title),
+AddressLine1:$.address.Line1 ++ generate(' ', 25 - sizeOf $.address.Line1) when ((sizeOf $.address.Line1) > 0 ) otherwise  $.address.Line1  ++ generate('~', 25 - sizeOf $.address.Line1),
+AddressLine2:$.address.Line2 ++ generate(' ', 25 - sizeOf $.address.Line2) when ((sizeOf $.address.Line2) > 0 ) otherwise  $.address.Line2  ++ generate('~', 25 - sizeOf $.address.Line2),
+AddressLine3:$.address.Line3 ++ generate(' ', 25 - sizeOf $.address.Line3) when ((sizeOf $.address.Line3) > 0 ) otherwise  $.address.Line3  ++ generate('~', 25 - sizeOf $.address.Line3),
+City :$.address.City  ++ generate(' ', 12 - sizeOf $.address.City ) when ((sizeOf $.address.City) > 0 ) otherwise  $.address.City  ++ generate('~', 12 - sizeOf $.address.City),
+County:$.address.County ++ generate(' ', 3 - sizeOf $.address.County) when ((sizeOf $.address.County) > 0 ) otherwise  $.address.County  ++ generate('~', 3 - sizeOf $.address.County),
+PostalCode:$.address.PostalCode ++ generate(' ',9- sizeOf $.address.PostalCode) when ((sizeOf $.address.PostalCode) > 0 ) otherwise  $.address.PostalCode  ++ generate('~', 9 - sizeOf $.address.PostalCode),
+StateOrProvince: $.address.State ++ generate(' ', 2 - sizeOf $.address.State) when ((sizeOf $.address.State) > 0 ) otherwise  $.address.State  ++ generate('~', 2 - sizeOf $.address.State)
+        }
+    })
+    
+    }]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="BILL-TO-SHORT-NAME" value="#[xpath3('//ContactInfo/a0/ShortName')]"/>
+            
+            <add-message-property key="BILL-TO-ADDR-1" value="#[xpath3('//ContactInfo/a0/AddressLine1')]"/>
+            <add-message-property key="BILL-TO-ADDR-2" value="#[xpath3('//ContactInfo/a0/AddressLine2')]"/>
+            <add-message-property key="BILL-TO-ADDR-3" value="#[xpath3('//ContactInfo/a0/AddressLine3')]"/>
+            <add-message-property key="BILL-TO-CITY" value="#[xpath3('//ContactInfo/a0/City')]"/>
+            <add-message-property key="BILL-TO-STATE" value="#[xpath3('//ContactInfo/a0/StateOrProvince')]"/>
+            <add-message-property key="BILL-TO-ZIP" value="#[xpath3('//ContactInfo/a0/PostalCode')]"/>
+            <add-message-property key="BILL-TO-CONTACT" value="#[xpath3('//ContactInfo/a0/Name')]"/>
+            <add-message-property key="BILL-TO-TITLE" value="#[xpath3('//ContactInfo/a0/Title')]"/>
+            <add-message-property key="BILL-TO-PHONE" value="#[xpath3('//ContactInfo/a0/Phone')]"/>
+            <add-message-property key="SHIP-TO-NAME" value="#[xpath3('//ContactInfo/a1/Name')]"/>
+            <add-message-property key="SHIP-TO-ADDR-1" value="#[xpath3('//ContactInfo/a1/AddressLine1')]"/>
+            <add-message-property key="SHIP-TO-ADDR-2" value="#[xpath3('//ContactInfo/a1/AddressLine2')]"/>
+            <add-message-property key="SHIP-TO-ADDR-3" value="#[xpath3('//ContactInfo/a1/AddressLine3')]"/>
+            <add-message-property key="SHIP-TO-CITY" value="#[xpath3('//ContactInfo/a1/City')]"/>
+            <add-message-property key="SHIP-TO-STATE" value="#[xpath3('//ContactInfo/a1/StateOrProvince')]"/>
+            <add-message-property key="SHIP-TO-ZIP" value="#[xpath3('//ContactInfo/a1/PostalCode')]"/>
+            <add-message-property key="SHIP-TO-FAX-NUM" value="#[xpath3('//ContactInfo/a1/Fax')]"/>
+            <add-message-property key="SHIP-TO-CNTY-CODE" value="#[xpath3('//ContactInfo/a1/County')]"/>
+            <add-message-property key="SHIP-TO-SALUTATION" value="#[xpath3('//ContactInfo/a1/Prefix')]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[xpath3('//ContactInfo/a1/Suffix')]"/>
+            <add-message-property key="CUST-PHONE-NO" value="#[xpath3('//ContactInfo/a1/Phone')]"/>
+            <add-message-property key="SHIP-TO-MAIL-NAME" value="#[xpath3('//ContactInfo/a2/Name')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-1" value="#[xpath3('//ContactInfo/a2/AddressLine1')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-2" value="#[xpath3('//ContactInfo/a2/AddressLine2')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-3" value="#[xpath3('//ContactInfo/a2/AddressLine3')]"/>
+            <add-message-property key="SHIP-TO-MAIL-CITY" value="#[xpath3('//ContactInfo/a2/City')]"/>
+            <add-message-property key="SHIP-TO-MAIL-STATE" value="#[xpath3('//ContactInfo/a2/StateOrProvince')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ZIP" value="#[xpath3('//ContactInfo/a2/PostalCode')]"/>
+            <add-message-property key="SHIP-TO-SALES-CONTACT" value="#[xpath3('//ContactInfo/a3/Name')]"/>
+            <add-message-property key="SALES-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a3/Phone')]"/>
+            <add-message-property key="SHIP-TO-BUS-CONTACT" value="#[xpath3('//ContactInfo/a4/Name')]"/>
+            <add-message-property key="BUS-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a4/Phone')]"/>
+            <add-message-property key="SHIP-TO-DELIV-CONTACT" value="#[xpath3('//ContactInfo/a5/Name')]"/>
+            <add-message-property key="DELIV-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a5/Phone')]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT" value="#[xpath3('//ContactInfo/a6/Name')]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT-PHON" value="#[xpath3('//ContactInfo/a6/Phone')]"/>
+        </message-properties-transformer>
+
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml 
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+Trim: { (payload.*PartyInformation map {
+UNIQUE-ID:$.Local.SalesforceIdentifier ++ generate(' ', 18 - sizeOf $.Local.SalesforceIdentifier) when ((sizeOf $.Local.SalesforceIdentifier) > 0 ) otherwise  $.Local.SalesforceIdentifier ++ generate('~', 18 - sizeOf $.Local.SalesforceIdentifier)  ,
+USERID:flowVars.DCSId,
+SALES-OFFICE:$.Local.SalesOffice ++ generate(' ', 2 - sizeOf $.Local.SalesOffice) when ((sizeOf $.Local.SalesOffice) > 0 ) otherwise  $.Local.SalesOffice ++ generate('~', 2 - sizeOf $.Local.SalesOffice),
+WAREHOUSE:$.Local.WarehouseName  ++ generate(' ', 2 - sizeOf $.Local.WarehouseName ) when ((sizeOf $.Local.WarehouseName ) > 0 ) otherwise  $.Local.WarehouseName  ++ generate('~', 2 - sizeOf $.Local.WarehouseName),
+CUST-NUMBER: generate('~', 6),
+CUST-SHIP-TO-SUFFIX:generate('~', 3),
+BILL-TO-SHORT-NAME:flowVars.BILL-TO-SHORT-NAME,
+AUTO-CR-COD-FLAG:$.Local.AutoCreditCodeFlag ++ generate('~', 1 - sizeOf $.Local.AutoCreditCodeFlag) when ((sizeOf $.Local.AutoCreditCodeFlag ) > 0 ) otherwise  $.Local.AutoCreditCodeFlag  ++ generate('~', 1 - sizeOf $.Local.AutoCreditCodeFlag),
+BILL-TO-NAME:$.Name ++ generate(' ', 25 - sizeOf $.Name ) when ((sizeOf $.Name) > 0 ) otherwise  $.Name ++ generate('~', 25)  ,
+AUTO-CR-DEPT:$.Local.AutoCreditDepartment ++ generate(' ', 2 - sizeOf $.Local.AutoCreditDepartment)  when ((sizeOf $.Local.AutoCreditDepartment ) > 0 ) otherwise  $.Local.AutoCreditDepartment  ++ generate('~', 2 - sizeOf $.Local.AutoCreditDepartment),
+BILL-TO-ADDR-1:flowVars.BILL-TO-ADDR-1,
+BILL-TO-ADDR-2:flowVars.BILL-TO-ADDR-2,
+BILL-TO-ADDR-3:flowVars.BILL-TO-ADDR-3,
+BILL-TO-CITY:flowVars.BILL-TO-CITY,
+BILL-TO-STATE:flowVars.BILL-TO-STATE,
+BILL-TO-ZIP:flowVars.BILL-TO-ZIP,
+CUST-TYPE-CODE:$.Local.CustomerTypeCode ++ generate(' ', 2 - sizeOf $.Local.CustomerTypeCode) when ((sizeOf $.Local.CustomerTypeCode ) > 0 ) otherwise  $.Local.CustomerTypeCode  ++ generate('~', 2 - sizeOf $.Local.CustomerTypeCode) ,
+BILL-TO-CONTACT:flowVars.BILL-TO-CONTACT,
+BILL-TO-TITLE:flowVars.BILL-TO-TITLE,
+NATIONAL-ACCOUNT:$.AccountType.AccountNumber ++ generate('~', 4 - sizeOf $.AccountType.AccountNumber),
+BILL-TO-PHONE:flowVars.BILL-TO-PHONE,
+SERVICE-BRANCH:$.AccountType.Region ++ generate(' ', 2 - sizeOf $.AccountType.Region) when ((sizeOf $.AccountType.Region) > 0 ) otherwise  $.AccountType.Region  ++ generate('~', 2 - sizeOf $.AccountType.Region) ,
+SHIP-TO-NAME:flowVars.SHIP-TO-NAME,
+SHIP-TO-MAIL-NAME:flowVars.SHIP-TO-MAIL-NAME,
+SHIP-TO-ADDR-1:flowVars.SHIP-TO-ADDR-1,
+SHIP-TO-MAIL-ADDR-1:flowVars.SHIP-TO-MAIL-ADDR-1,
+SHIP-TO-ADDR-2:flowVars.SHIP-TO-ADDR-2,
+SHIP-TO-MAIL-ADDR-2:flowVars.SHIP-TO-MAIL-ADDR-2,
+SHIP-TO-ADDR-3:flowVars.SHIP-TO-ADDR-3,
+SHIP-TO-MAIL-ADDR-3:flowVars.SHIP-TO-MAIL-ADDR-3,
+SHIP-TO-CITY:flowVars.SHIP-TO-CITY,
+SHIP-TO-STATE:flowVars.SHIP-TO-STATE,
+SHIP-TO-ZIP:flowVars.SHIP-TO-ZIP,
+SHIP-TO-MAIL-CITY:flowVars.SHIP-TO-MAIL-CITY,
+SHIP-TO-MAIL-STATE:flowVars.SHIP-TO-MAIL-STATE,
+SHIP-TO-MAIL-ZIP:flowVars.SHIP-TO-MAIL-ZIP,
+CUST-PHONE-NO:flowVars.CUST-PHONE-NO  ,
+SHIP-TO-FAX-NUM:flowVars.SHIP-TO-FAX-NUM,
+SHIP-TO-CNTY-CODE:flowVars.SHIP-TO-CNTY-CODE,
+SHIP-TO-ALIAS-1:$.Local.ShipToAlias-1 ++ generate(' ', 11 - sizeOf $.Local.ShipToAlias-1) when ((sizeOf $.Local.ShipToAlias-1) > 0 ) otherwise  $.Local.ShipToAlias-1  ++ generate('~', 11 - sizeOf $.Local.ShipToAlias-1) ,
+SHIP-TO-ALIAS-2:$.Local.ShipToAlias-2 ++ generate(' ', 11 - sizeOf $.Local.ShipToAlias-2) when ((sizeOf $.Local.ShipToAlias-1) > 0 ) otherwise  $.Local.ShipToAlias-2  ++ generate('~', 11 - sizeOf $.Local.ShipToAlias-2) ,
+FED-EPA-NUMBER:flowVars.FED-EPA-NUMBER,
+STATE-ID-1:flowVars.STATE-ID-1,
+STATE-EPA-NUMBER:flowVars.STATE-EPA-NUMBER,
+STATE-ID-2:flowVars.STATE-ID-2,
+STATE-EPA-NUMBER-2:flowVars.STATE-EPA-NUMBER-2 ,
+CUST-SHIP-VIA-CODE:$.Local.ShipVia ++ generate(' ', 4 - sizeOf $.Local.ShipVia) when ((sizeOf $.Local.ShipVia) > 0 ) otherwise  $.Local.ShipVia  ++ generate('~', 4 - sizeOf $.Local.ShipVia) ,
+CUST-SHIP-TERMS-CODE:$.Local.ShipTerms ++ generate(' ', 2 - sizeOf $.Local.ShipTerms) when ((sizeOf $.Local.ShipTerms) > 0 ) otherwise  $.Local.ShipTerms  ++ generate('~', 2 - sizeOf $.Local.ShipTerms) ,
+SHIP-TO-DEPT-01:$.Local.ShipToDepartment ++ generate(' ', 2 - sizeOf $.Local.ShipToDepartment) when ((sizeOf $.Local.ShipToDepartment) > 0 ) otherwise  $.Local.ShipToDepartment  ++ generate('~', 2 - sizeOf $.Local.ShipToDepartment) ,
+CUST-SLSMN1-CODE:flowVars.CUST-SLSMN1-CODE,
+PCS-LICENSE-NUMBER:$.Local.PCSLicenseNumber ++ generate(' ', 15 - sizeOf $.Local.PCSLicenseNumber) when ((sizeOf $.Local.PCSLicenseNumber) > 0 ) otherwise  $.Local.PCSLicenseNumber ++ generate('~', 15 - sizeOf $.Local.PCSLicenseNumber) ,
+PCS-EXPIRE-DATE:$.Local.PCSExpiryDate ++ generate('~', 8 - sizeOf $.Local.PCSExpiryDate) ,
+PCS-LIC-NAME:$.Local.PCSLicenseName ++ generate(' ', 25 - sizeOf $.Local.PCSLicenseName) when ((sizeOf $.Local.PCSLicenseName) > 0 ) otherwise  $.Local.PCSLicenseName  ++ generate('~', 25 - sizeOf $.Local.PCSLicenseName) ,
+STWRD-EXP-DATE:$.Local.STWRDExpiryDate ++ generate('~', 8 - sizeOf $.Local.STWRDExpiryDate) ,
+CUST-TAX-EXEPT-CERT-NO:$.TaxInformation.TaxCertificateNumber ++ generate(' ', 20 - sizeOf $.TaxInformation.TaxCertificateNumber) when ((sizeOf $.TaxInformation.TaxCertificateNumber) > 0 ) otherwise  $.TaxInformation.TaxCertificateNumber  ++ generate('~', 20 - sizeOf $.TaxInformation.TaxCertificateNumber) ,
+TAX-EXEPT-EXPR-DT:$.TaxInformation.ExpiryDate ++ generate(' ', 8 - sizeOf $.TaxInformation.ExpiryDate) when ((sizeOf $.TaxInformation.ExpiryDate) > 0 ) otherwise  $.TaxInformation.ExpiryDate  ++ generate('~', 8 - sizeOf $.TaxInformation.ExpiryDate) ,
+COMB-TABLE-CODE:$.Local.CombTableCode ++ generate(' ', 4 - sizeOf $.Local.CombTableCode) when ((sizeOf $.Local.CombTableCode) > 0 ) otherwise  $.Local.CombTableCode  ++ generate('~', 4 - sizeOf $.Local.CombTableCode) ,
+SHIP-TO-CONTAINER-DE:$.Local.ShipToContainer ++ generate(' ', 1 - sizeOf $.Local.ShipToContainer) when ((sizeOf $.Local.ShipToContainer) > 0 ) otherwise  $.Local.ShipToContainer  ++ generate('~', 1 - sizeOf $.Local.ShipToContainer) ,
+PRINT-PRICE-FLAG:$.Local.PrintPriceFlag  ++ generate(' ', 1 - sizeOf $.Local.PrintPriceFlag ) when ((sizeOf $.Local.PrintPriceFlag ) > 0 ) otherwise  $.Local.PrintPriceFlag   ++ generate('~', 1 - sizeOf $.Local.PrintPriceFlag) ,
+PRIME-DELIV-METHOD:$.Local.PrimaryDeliveryMethod ++ generate(' ', 2 - sizeOf $.Local.PrimaryDeliveryMethod) when ((sizeOf $.Local.PrimaryDeliveryMethod) > 0 ) otherwise  $.Local.PrimaryDeliveryMethod  ++ generate('~', 2 - sizeOf $.Local.PrimaryDeliveryMethod) ,
+CUST-ORDR-FILL-CODE:$.Local.ShipmentIndicatorCode  ++ generate(' ', 1 - sizeOf $.Local.ShipmentIndicatorCode ) when ((sizeOf $.Local.ShipmentIndicatorCode) > 0 ) otherwise  $.Local.ShipmentIndicatorCode  ++ generate('~', 1 - sizeOf $.Local.ShipmentIndicatorCode) ,
+MAIL-INV-FLAG:$.Local.MailInvoiceFlag ++ generate(' ', 1 - sizeOf $.Local.MailInvoiceFlag) when ((sizeOf $.Local.MailInvoiceFlag) > 0 ) otherwise  $.Local.MailInvoiceFlag  ++ generate('~', 1 - sizeOf $.Local.MailInvoiceFlag) ,
+CUST-CLASS-CODE:$.Local.CustomerClassCode ++ generate(' ', 3 - sizeOf $.Local.CustomerClassCode) when ((sizeOf $.Local.CustomerClassCode) > 0 ) otherwise  $.Local.CustomerClassCode  ++ generate('~', 3 - sizeOf $.Local.CustomerClassCode) ,
+SINGLE-LOT-FLAG:$.Local.SingleLotFlag ++ generate(' ', 1 - sizeOf $.Local.SingleLotFlag) when ((sizeOf $.Local.SingleLotFlag) > 0 ) otherwise  $.Local.SingleLotFlag  ++ generate('~', 1 - sizeOf $.Local.SingleLotFlag) ,
+EXPORTER-FLAG:$.Local.ExporterFlag ++ generate(' ', 1 - sizeOf $.Local.ExporterFlag) when ((sizeOf $.Local.ExporterFlag) > 0 ) otherwise  $.Local.ExporterFlag  ++ generate('~', 1 - sizeOf $.Local.ExporterFlag) ,
+SHIP-TO-SALUTATION:flowVars.SHIP-TO-SALUTATION,
+SHIP-TO-SALES-CONTACT:flowVars.SHIP-TO-SALES-CONTACT,
+SALES-CONTACT-PHONE:flowVars.SALES-CONTACT-PHONE,
+SHIP-TO-BUS-CONTACT:flowVars.SHIP-TO-BUS-CONTACT,
+BUS-CONTACT-PHONE:flowVars.BUS-CONTACT-PHONE,
+SHIP-TO-DELIV-CONTACT:flowVars.SHIP-TO-DELIV-CONTACT,
+DELIV-CONTACT-PHONE:flowVars.DELIV-CONTACT-PHONE,
+SHIP-TO-TECH-CONTACT:flowVars.SHIP-TO-TECH-CONTACT,
+SHIP-TO-TECH-CONTACT-PHON:flowVars.SHIP-TO-TECH-CONTACT-PHON 
+}
+)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            
+            <add-message-property key="BILL-TO-SHORT-NAME" value="#[flowVars['BILL-TO-SHORT-NAME'].substring(0,10)]"/>
+            
+            <add-message-property key="BILL-TO-ADDR-1" value="#[flowVars['BILL-TO-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-ADDR-2" value="#[flowVars['BILL-TO-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-ADDR-3" value="#[flowVars['BILL-TO-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-CITY" value="#[flowVars['BILL-TO-CITY'].substring(0,12)]"/>
+            <add-message-property key="BILL-TO-STATE" value="#[flowVars['BILL-TO-STATE'].substring(0,2)]"/>
+            <add-message-property key="BILL-TO-ZIP" value="#[flowVars['BILL-TO-ZIP'].substring(0,9)]"/>
+            <add-message-property key="BILL-TO-CONTACT" value="#[flowVars['BILL-TO-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-TITLE" value="#[flowVars['BILL-TO-TITLE'].substring(0,20)]"/>
+            <add-message-property key="BILL-TO-PHONE" value="#[flowVars['BILL-TO-PHONE'].substring(0,12)]"/>
+            
+            <add-message-property key="SHIP-TO-NAME" value="#[flowVars['SHIP-TO-NAME'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-1" value="#[flowVars['SHIP-TO-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-2" value="#[flowVars['SHIP-TO-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-3" value="#[flowVars['SHIP-TO-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-CITY" value="#[flowVars['SHIP-TO-CITY'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-STATE" value="#[flowVars['SHIP-TO-STATE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-ZIP" value="#[flowVars['SHIP-TO-ZIP'].substring(0,9)]"/>
+            <add-message-property key="SHIP-TO-FAX-NUM" value="#[flowVars['SHIP-TO-FAX-NUM'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-CNTY-CODE" value="#[flowVars['SHIP-TO-CNTY-CODE'].substring(0,3)]"/>
+            <add-message-property key="SHIP-TO-SALUTATION" value="#[flowVars['SHIP-TO-SALUTATION'].substring(0,15)]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[flowVars['CUST-SHIP-TO-SUFFIX'].substring(0,3)]"/>
+            
+            <add-message-property key="SHIP-TO-MAIL-NAME" value="#[flowVars['SHIP-TO-MAIL-NAME'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-1" value="#[flowVars['SHIP-TO-MAIL-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-2" value="#[flowVars['SHIP-TO-MAIL-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-3" value="#[flowVars['SHIP-TO-MAIL-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-CITY" value="#[flowVars['SHIP-TO-MAIL-CITY'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-MAIL-STATE" value="#[flowVars['SHIP-TO-MAIL-STATE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ZIP" value="#[flowVars['SHIP-TO-MAIL-ZIP'].substring(0,9)]"/>
+            
+            <add-message-property key="SHIP-TO-SALES-CONTACT" value="#[flowVars['SHIP-TO-SALES-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="SALES-CONTACT-PHONE" value="#[flowVars['SALES-CONTACT-PHONE'].substring(0,12)]"/> 
+            
+            <add-message-property key="SHIP-TO-BUS-CONTACT" value="#[flowVars['SHIP-TO-BUS-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="BUS-CONTACT-PHONE" value="#[flowVars['BUS-CONTACT-PHONE'].substring(0,12)]"/>
+            
+            <add-message-property key="SHIP-TO-DELIV-CONTACT" value="#[flowVars['SHIP-TO-DELIV-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="DELIV-CONTACT-PHONE" value="#[flowVars['DELIV-CONTACT-PHONE'].substring(0,12)]"/>
+            
+            <add-message-property key="SHIP-TO-TECH-CONTACT" value="#[flowVars['SHIP-TO-TECH-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT-PHON" value="#[flowVars['SHIP-TO-TECH-CONTACT-PHON'].substring(0,12)]"/>
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="UNIQUE-ID" value="#[xpath3('//Trim/UNIQUE-ID')]"/>
+            <add-message-property key="SALES-OFFICE" value="#[xpath3('//Trim/SALES-OFFICE')]"/>
+            <add-message-property key="WAREHOUSE" value="#[xpath3('//Trim/WAREHOUSE')]"/>
+            <add-message-property key="BILL-TO-NAME" value="#[xpath3('//Trim/BILL-TO-NAME')]"/>
+            <add-message-property key="CUST-NUMBER" value="#[xpath3('//Trim/CUST-NUMBER')]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[xpath3('//Trim/CUST-SHIP-TO-SUFFIX')]"/>
+            <add-message-property key="AUTO-CR-COD-FLAG" value="#[xpath3('//Trim/AUTO-CR-COD-FLAG')]"/>
+            <add-message-property key="AUTO-CR-DEPT" value="#[xpath3('//Trim/AUTO-CR-DEPT')]"/>
+            <add-message-property key="CUST-TYPE-CODE" value="#[xpath3('//Trim/CUST-TYPE-CODE')]"/>
+            <add-message-property key="NATIONAL-ACCOUNT" value="#[xpath3('//Trim/NATIONAL-ACCOUNT')]"/>
+            <add-message-property key="SERVICE-BRANCH" value="#[xpath3('//Trim/SERVICE-BRANCH')]"/>
+            
+            <add-message-property key="SHIP-TO-ALIAS-1" value="#[xpath3('//Trim/SHIP-TO-ALIAS-1')]"/>
+            <add-message-property key="SHIP-TO-ALIAS-2" value="#[xpath3('//Trim/SHIP-TO-ALIAS-2')]"/>
+            <add-message-property key="CUST-SHIP-VIA-CODE" value="#[xpath3('//Trim/CUST-SHIP-VIA-CODE')]"/>
+            <add-message-property key="CUST-SHIP-TERMS-CODE" value="#[xpath3('//Trim/CUST-SHIP-TERMS-CODE')]"/>
+            <add-message-property key="SHIP-TO-DEPT-01" value="#[xpath3('//Trim/SHIP-TO-DEPT-01')]"/>
+            <add-message-property key="PCS-LICENSE-NUMBER" value="#[xpath3('//Trim/PCS-LICENSE-NUMBER')]"/>
+            <add-message-property key="PCS-EXPIRE-DATE" value="#[xpath3('//Trim/PCS-EXPIRE-DATE')]"/>
+            <add-message-property key="PCS-LIC-NAME" value="#[xpath3('//Trim/PCS-LIC-NAME')]"/>
+            <add-message-property key="STWRD-EXP-DATE" value="#[xpath3('//Trim/STWRD-EXP-DATE')]"/>
+            <add-message-property key="CUST-TAX-EXEPT-CERT-NO" value="#[xpath3('//Trim/CUST-TAX-EXEPT-CERT-NO')]"/>
+            <add-message-property key="TAX-EXEPT-EXPR-DT" value="#[xpath3('//Trim/TAX-EXEPT-EXPR-DT')]"/>
+            <add-message-property key="COMB-TABLE-CODE" value="#[xpath3('//Trim/COMB-TABLE-CODE')]"/>
+            <add-message-property key="SHIP-TO-CONTAINER-DE" value="#[xpath3('//Trim/SHIP-TO-CONTAINER-DE')]"/>
+            <add-message-property key="PRINT-PRICE-FLAG" value="#[xpath3('//Trim/PRINT-PRICE-FLAG')]"/>
+            <add-message-property key="PRIME-DELIV-METHOD" value="#[xpath3('//Trim/PRIME-DELIV-METHOD')]"/>
+            <add-message-property key="CUST-ORDR-FILL-CODE" value="#[xpath3('//Trim/CUST-ORDR-FILL-CODE')]"/>
+            <add-message-property key="MAIL-INV-FLAG" value="#[xpath3('//Trim/MAIL-INV-FLAG')]"/>
+            <add-message-property key="CUST-CLASS-CODE" value="#[xpath3('//Trim/CUST-CLASS-CODE')]"/>
+            <add-message-property key="SINGLE-LOT-FLAG" value="#[xpath3('//Trim/SINGLE-LOT-FLAG')]"/>
+            <add-message-property key="EXPORTER-FLAG" value="#[xpath3('//Trim/EXPORTER-FLAG')]"/>
+       </message-properties-transformer>
+        <message-properties-transformer doc:name="Message Properties" scope="invocation">
+
+            <add-message-property key="UNIQUE-ID" value="#[flowVars['UNIQUE-ID'].substring(0,18)]"/>
+            <add-message-property key="SALES-OFFICE" value="#[flowVars['SALES-OFFICE'].substring(0,2)]"/>
+            <add-message-property key="WAREHOUSE" value="#[flowVars['WAREHOUSE'].substring(0,2)]"/>
+            <add-message-property key="BILL-TO-NAME" value="#[flowVars['BILL-TO-NAME'].substring(0,25)]"/>
+            <add-message-property key="CUST-NUMBER" value="#[flowVars['CUST-NUMBER'].substring(0,6)]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[flowVars['CUST-SHIP-TO-SUFFIX'].substring(0,3)]"/>
+            <add-message-property key="AUTO-CR-COD-FLAG" value="#[flowVars['AUTO-CR-COD-FLAG'].substring(0,1)]"/>
+            <add-message-property key="AUTO-CR-DEPT" value="#[flowVars['AUTO-CR-DEPT'].substring(0,2)]"/>
+            <add-message-property key="CUST-TYPE-CODE" value="#[flowVars['CUST-TYPE-CODE'].substring(0,2)]"/>
+            <add-message-property key="NATIONAL-ACCOUNT" value="#[flowVars['NATIONAL-ACCOUNT'].substring(0,4)]"/>
+            <add-message-property key="SERVICE-BRANCH" value="#[flowVars['SERVICE-BRANCH'].substring(0,2)]"/>
+            <add-message-property key="CUST-PHONE-NO" value="#[flowVars['CUST-PHONE-NO'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-ALIAS-1" value="#[flowVars['SHIP-TO-ALIAS-1'].substring(0,11)]"/>
+            <add-message-property key="SHIP-TO-ALIAS-2" value="#[flowVars['SHIP-TO-ALIAS-2'].substring(0,11)]"/>
+            <add-message-property key="CUST-SHIP-VIA-CODE" value="#[flowVars['CUST-SHIP-VIA-CODE'].substring(0,4)]"/>
+            <add-message-property key="CUST-SHIP-TERMS-CODE" value="#[flowVars['CUST-SHIP-TERMS-CODE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-DEPT-01" value="#[flowVars['SHIP-TO-DEPT-01'].substring(0,2)]"/>
+            <add-message-property key="PCS-LICENSE-NUMBER" value="#[flowVars['PCS-LICENSE-NUMBER'].substring(0,15)]"/>
+            <add-message-property key="PCS-EXPIRE-DATE" value="#[flowVars['PCS-EXPIRE-DATE'].substring(0,8)]"/>
+            <add-message-property key="PCS-LIC-NAME" value="#[flowVars['PCS-LIC-NAME'].substring(0,25)]"/>
+            <add-message-property key="STWRD-EXP-DATE" value="#[flowVars['STWRD-EXP-DATE'].substring(0,8)]"/>
+            <add-message-property key="CUST-TAX-EXEPT-CERT-NO" value="#[flowVars['CUST-TAX-EXEPT-CERT-NO'].substring(0,20)]"/>
+            <add-message-property key="TAX-EXEPT-EXPR-DT" value="#[flowVars['TAX-EXEPT-EXPR-DT'].substring(0,8)]"/>
+            <add-message-property key="COMB-TABLE-CODE" value="#[flowVars['COMB-TABLE-CODE'].substring(0,4)]"/>
+            <add-message-property key="SHIP-TO-CONTAINER-DE" value="#[flowVars['SHIP-TO-CONTAINER-DE'].substring(0,1)]"/>
+            <add-message-property key="PRINT-PRICE-FLAG" value="#[flowVars['PRINT-PRICE-FLAG'].substring(0,1)]"/>
+            <add-message-property key="PRIME-DELIV-METHOD" value="#[flowVars['PRIME-DELIV-METHOD'].substring(0,2)]"/>
+            <add-message-property key="CUST-ORDR-FILL-CODE" value="#[flowVars['CUST-ORDR-FILL-CODE'].substring(0,1)]"/>
+            <add-message-property key="MAIL-INV-FLAG" value="#[flowVars['MAIL-INV-FLAG'].substring(0,1)]"/>
+            <add-message-property key="CUST-CLASS-CODE" value="#[flowVars['CUST-CLASS-CODE'].substring(0,3)]"/>
+            <add-message-property key="SINGLE-LOT-FLAG" value="#[flowVars['SINGLE-LOT-FLAG'].substring(0,1)]"/>
+            <add-message-property key="EXPORTER-FLAG" value="#[flowVars['EXPORTER-FLAG'].substring(0,1)]"/>
+            
+            <add-message-property key="FED-EPA-NUMBER" value="#[flowVars['FED-EPA-NUMBER'].substring(0,12)]"/>
+            <add-message-property key="STATE-EPA-NUMBER" value="#[flowVars['STATE-EPA-NUMBER'].substring(0,12)]"/>
+            <add-message-property key="STATE-EPA-NUMBER-2" value="#[flowVars['STATE-EPA-NUMBER-2'].substring(0,12)]"/>
+            <add-message-property key="STATE-ID-1" value="#[flowVars['STATE-ID-1'].substring(0,2)]"/>
+            <add-message-property key="STATE-ID-2" value="#[flowVars['STATE-ID-2'].substring(0,2)]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false, separator="|", escape="<"
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+UNIQUE-ID:flowVars.UNIQUE-ID,
+USERID:flowVars.DCSId,
+SALES-OFFICE:flowVars.SALES-OFFICE,
+WAREHOUSE:flowVars.WAREHOUSE,
+CUST-NUMBER:generate('~',6),
+CUST-SHIP-TO-SUFFIX:generate('~',3),
+BILL-TO-SHORT-NAME:flowVars.BILL-TO-SHORT-NAME,
+AUTO-CR-COD-FLAG:flowVars.AUTO-CR-COD-FLAG,
+BILL-TO-NAME:flowVars.BILL-TO-NAME,
+AUTO-CR-DEPT:flowVars.AUTO-CR-DEPT,
+BILL-TO-ADDR-1:flowVars.BILL-TO-ADDR-1,
+BILL-TO-ADDR-2:flowVars.BILL-TO-ADDR-2,
+BILL-TO-ADDR-3:flowVars.BILL-TO-ADDR-3,
+BILL-TO-CITY:flowVars.BILL-TO-CITY,
+BILL-TO-STATE:flowVars.BILL-TO-STATE,
+BILL-TO-ZIP:flowVars.BILL-TO-ZIP,
+CUST-TYPE-CODE:flowVars.CUST-TYPE-CODE,
+BILL-TO-CONTACT:flowVars.BILL-TO-CONTACT,
+BILL-TO-TITLE:flowVars.BILL-TO-TITLE,
+NATIONAL-ACCOUNT:flowVars.NATIONAL-ACCOUNT,
+BILL-TO-PHONE:flowVars.BILL-TO-PHONE,
+SERVICE-BRANCH:flowVars.SERVICE-BRANCH,
+SHIP-TO-NAME:flowVars.SHIP-TO-NAME,
+SHIP-TO-MAIL-NAME:flowVars.SHIP-TO-MAIL-NAME,
+SHIP-TO-ADDR-1:flowVars.SHIP-TO-ADDR-1,
+SHIP-TO-MAIL-ADDR-1:flowVars.SHIP-TO-MAIL-ADDR-1,
+SHIP-TO-ADDR-2:flowVars.SHIP-TO-ADDR-2,
+SHIP-TO-MAIL-ADDR-2:flowVars.SHIP-TO-MAIL-ADDR-2,
+SHIP-TO-ADDR-3:flowVars.SHIP-TO-ADDR-3,
+SHIP-TO-MAIL-ADDR-3:flowVars.SHIP-TO-MAIL-ADDR-3,
+SHIP-TO-CITY:flowVars.SHIP-TO-CITY,
+SHIP-TO-STATE:flowVars.SHIP-TO-STATE,
+SHIP-TO-ZIP:flowVars.SHIP-TO-ZIP,
+SHIP-TO-MAIL-CITY:flowVars.SHIP-TO-MAIL-CITY,
+SHIP-TO-MAIL-STATE:flowVars.SHIP-TO-MAIL-STATE,
+SHIP-TO-MAIL-ZIP:flowVars.SHIP-TO-MAIL-ZIP,
+CUST-PHONE-NO:flowVars.CUST-PHONE-NO,
+SHIP-TO-FAX-NUM:flowVars.SHIP-TO-FAX-NUM,
+SHIP-TO-CNTY-CODE:flowVars.SHIP-TO-CNTY-CODE,
+SHIP-TO-ALIAS-1:flowVars.SHIP-TO-ALIAS-1,
+SHIP-TO-ALIAS-2:flowVars.SHIP-TO-ALIAS-2,
+FED-EPA-NUMBER:flowVars.FED-EPA-NUMBER,
+STATE-ID-1:flowVars.STATE-ID-1,
+STATE-EPA-NUMBER:flowVars.STATE-EPA-NUMBER,
+STATE-ID-2:flowVars.STATE-ID-2,
+STATE-EPA-NUMBER-2:( flowVars.STATE-EPA-NUMBER-2  ++ generate(' ', 3) unless (flowVars.STATE-EPA-NUMBER-2 == "~~~~~~~~~~~~") otherwise  generate('~',3) ) ,
+CUST-SHIP-VIA-CODE:flowVars.CUST-SHIP-VIA-CODE,
+CUST-SHIP-TERMS-CODE:flowVars.CUST-SHIP-TERMS-CODE,
+SHIP-TO-DEPT-01:flowVars.SHIP-TO-DEPT-01,
+CUST-SLSMN1-CODE:flowVars.CUST-SLSMN1-CODE,
+PCS-LICENSE-NUMBER:flowVars.PCS-LICENSE-NUMBER,
+PCS-EXPIRE-DATE:flowVars.PCS-EXPIRE-DATE,
+PCS-LIC-NAME:flowVars.PCS-LIC-NAME,
+STWRD-EXP-DATE:flowVars.STWRD-EXP-DATE,
+CUST-TAX-EXEPT-CERT-NO:flowVars.CUST-TAX-EXEPT-CERT-NO,
+TAX-EXEPT-EXPR-DT:flowVars.TAX-EXEPT-EXPR-DT,
+COMB-TABLE-CODE:flowVars.COMB-TABLE-CODE,
+SHIP-TO-CONTAINER-DE:flowVars.SHIP-TO-CONTAINER-DE,
+PRINT-PRICE-FLAG:flowVars.PRINT-PRICE-FLAG,
+PRIME-DELIV-METHOD:flowVars.PRIME-DELIV-METHOD,
+CUST-ORDR-FILL-CODE:flowVars.CUST-ORDR-FILL-CODE,
+MAIL-INV-FLAG:flowVars.MAIL-INV-FLAG,
+CUST-CLASS-CODE:flowVars.CUST-CLASS-CODE,
+SINGLE-LOT-FLAG:flowVars.SINGLE-LOT-FLAG,
+EXPORTER-FLAG:flowVars.EXPORTER-FLAG,
+SHIP-TO-SALUTATION:flowVars.SHIP-TO-SALUTATION,
+SHIP-TO-SALES-CONTACT:flowVars.SHIP-TO-SALES-CONTACT,
+SALES-CONTACT-PHONE:flowVars.SALES-CONTACT-PHONE,
+SHIP-TO-BUS-CONTACT:flowVars.SHIP-TO-BUS-CONTACT,
+BUS-CONTACT-PHONE:flowVars.BUS-CONTACT-PHONE,
+SHIP-TO-DELIV-CONTACT:flowVars.SHIP-TO-DELIV-CONTACT,
+DELIV-CONTACT-PHONE:flowVars.DELIV-CONTACT-PHONE,
+SHIP-TO-TECH-CONTACT:flowVars.SHIP-TO-TECH-CONTACT,
+SHIP-TO-TECH-CONTACT-PHON:flowVars.SHIP-TO-TECH-CONTACT-PHON 
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-payload value="#[payload.replaceAll(&quot;&lt;&quot;, &quot;&quot;).replaceAll(&quot;\r&quot;, &quot;&quot;).replaceAll(&quot;\n&quot;, &quot;&quot;).toString()]" mimeType="application/csv" doc:name="Set Payload"/>
+    
+    </sub-flow>
+    <sub-flow name="Create-ShipToSub_Flow">
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+	EPAInfo: { (payload.PartyInformation.*EPAInformation map {
+        ("a$$"): {
+            EPANumber: $.EPANumber  ++ generate(' ', 12 - sizeOf $.EPANumber) when ((sizeOf $.EPANumber) > 0 ) otherwise  $.EPANumber  ++ generate('~', 12 - sizeOf $.EPANumber)  ,
+                        EPAID: $.EPAID ++ generate(' ', 2 - sizeOf $.EPAID)  when ((sizeOf $.EPAID) > 0 ) otherwise  $.EPAID  ++ generate('~', 2 - sizeOf $.EPAID)  
+        }
+    })
+    
+    }]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="FED-EPA-NUMBER" value="#[xpath3('//EPAInfo/a0/EPANumber')]"/>
+            <add-message-property key="STATE-EPA-NUMBER" value="#[xpath3('//EPAInfo/a1/EPANumber')]"/>
+            <add-message-property key="STATE-EPA-NUMBER-2" value="#[xpath3('//EPAInfo/a2/EPANumber')]"/>
+            <add-message-property key="STATE-ID-1" value="#[xpath3('//EPAInfo/a1/EPAID')]"/>
+            <add-message-property key="STATE-ID-2" value="#[xpath3('//EPAInfo/a2/EPAID')]"/>
+        </message-properties-transformer>
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+	ContactInfo: { (payload.PartyInformation.*contact map {
+        ("a$$"): {
+Type:$.Type ,
+Name:$.Name ++ generate(' ', 25 - sizeOf $.Name) when ((sizeOf $.Name) > 0 ) otherwise  $.Name  ++ generate('~', 25 - sizeOf $.Name) ,
+FirstName:$.FirstName ++ generate(' ', 25 - sizeOf $.FirstName) when ((sizeOf $.FirstName) > 0 ) otherwise  $.FirstName  ++ generate('~', 25 - sizeOf $.FirstName),
+LastName:$.LastName ++ generate(' ', 20 - sizeOf $.LastName) when ((sizeOf $.LastName) > 0 ) otherwise  $.LastName  ++ generate('~', 20 - sizeOf $.LastName),
+Fax:$.Fax ++ generate(' ', 12 - sizeOf $.Fax) when ((sizeOf $.Fax) > 0 ) otherwise  $.Fax  ++ generate('~', 12 - sizeOf $.Fax) ,
+Phone:$.Phone ++ generate(' ', 12 - sizeOf $.Phone) when ((sizeOf $.Phone) > 0 ) otherwise  $.Phone  ++ generate('~', 12 - sizeOf $.Phone),
+Prefix:$.Prefix ++ generate(' ', 15 - sizeOf $.Prefix) when ((sizeOf $.Prefix) > 0 ) otherwise  $.Prefix  ++ generate('~', 15 - sizeOf $.Prefix),
+ShortName:$.ShortName ++ generate(' ', 10 - sizeOf $.ShortName) when ((sizeOf $.ShortName) > 0 ) otherwise  $.ShortName  ++ generate('~', 10 - sizeOf $.ShortName),
+Suffix:$.Suffix ++ generate(' ', 3 - sizeOf $.Suffix) when ((sizeOf $.Suffix) > 0 ) otherwise  $.Suffix  ++ generate('~', 3 - sizeOf $.Suffix), 
+Title:$.Title ++ generate(' ', 20 - sizeOf $.Title) when ((sizeOf $.Title) > 0 ) otherwise  $.Title  ++ generate('~', 20 - sizeOf $.Title),
+AddressLine1:$.address.Line1 ++ generate(' ', 25 - sizeOf $.address.Line1) when ((sizeOf $.address.Line1) > 0 ) otherwise  $.address.Line1  ++ generate('~', 25 - sizeOf $.address.Line1),
+AddressLine2:$.address.Line2 ++ generate(' ', 25 - sizeOf $.address.Line2) when ((sizeOf $.address.Line2) > 0 ) otherwise  $.address.Line2  ++ generate('~', 25 - sizeOf $.address.Line2),
+AddressLine3:$.address.Line3 ++ generate(' ', 25 - sizeOf $.address.Line3) when ((sizeOf $.address.Line3) > 0 ) otherwise  $.address.Line3  ++ generate('~', 25 - sizeOf $.address.Line3),
+City :$.address.City  ++ generate(' ', 12 - sizeOf $.address.City ) when ((sizeOf $.address.City) > 0 ) otherwise  $.address.City  ++ generate('~', 12 - sizeOf $.address.City),
+County:$.address.County ++ generate(' ', 3 - sizeOf $.address.County) when ((sizeOf $.address.County) > 0 ) otherwise  $.address.County  ++ generate('~', 3 - sizeOf $.address.County),
+PostalCode:$.address.PostalCode ++ generate(' ',9- sizeOf $.address.PostalCode) when ((sizeOf $.address.PostalCode) > 0 ) otherwise  $.address.PostalCode  ++ generate('~', 9 - sizeOf $.address.PostalCode),
+StateOrProvince: $.address.State ++ generate(' ', 2 - sizeOf $.address.State) when ((sizeOf $.address.State) > 0 ) otherwise  $.address.State  ++ generate('~', 2 - sizeOf $.address.State)
+        }
+    })
+    
+    }]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="BILL-TO-SHORT-NAME" value="#[xpath3('//ContactInfo/a0/ShortName')]"/>
+            
+            <add-message-property key="BILL-TO-ADDR-1" value="#[xpath3('//ContactInfo/a0/AddressLine1')]"/>
+            <add-message-property key="BILL-TO-ADDR-2" value="#[xpath3('//ContactInfo/a0/AddressLine2')]"/>
+            <add-message-property key="BILL-TO-ADDR-3" value="#[xpath3('//ContactInfo/a0/AddressLine3')]"/>
+            <add-message-property key="BILL-TO-CITY" value="#[xpath3('//ContactInfo/a0/City')]"/>
+            <add-message-property key="BILL-TO-STATE" value="#[xpath3('//ContactInfo/a0/StateOrProvince')]"/>
+            <add-message-property key="BILL-TO-ZIP" value="#[xpath3('//ContactInfo/a0/PostalCode')]"/>
+            <add-message-property key="BILL-TO-CONTACT" value="#[xpath3('//ContactInfo/a0/Name')]"/>
+            <add-message-property key="BILL-TO-TITLE" value="#[xpath3('//ContactInfo/a0/Title')]"/>
+            <add-message-property key="BILL-TO-PHONE" value="#[xpath3('//ContactInfo/a0/Phone')]"/>
+            <add-message-property key="SHIP-TO-NAME" value="#[xpath3('//ContactInfo/a1/Name')]"/>
+            <add-message-property key="SHIP-TO-ADDR-1" value="#[xpath3('//ContactInfo/a1/AddressLine1')]"/>
+            <add-message-property key="SHIP-TO-ADDR-2" value="#[xpath3('//ContactInfo/a1/AddressLine2')]"/>
+            <add-message-property key="SHIP-TO-ADDR-3" value="#[xpath3('//ContactInfo/a1/AddressLine3')]"/>
+            <add-message-property key="SHIP-TO-CITY" value="#[xpath3('//ContactInfo/a1/City')]"/>
+            <add-message-property key="SHIP-TO-STATE" value="#[xpath3('//ContactInfo/a1/StateOrProvince')]"/>
+            <add-message-property key="SHIP-TO-ZIP" value="#[xpath3('//ContactInfo/a1/PostalCode')]"/>
+            <add-message-property key="SHIP-TO-FAX-NUM" value="#[xpath3('//ContactInfo/a1/Fax')]"/>
+            <add-message-property key="SHIP-TO-CNTY-CODE" value="#[xpath3('//ContactInfo/a1/County')]"/>
+            <add-message-property key="SHIP-TO-SALUTATION" value="#[xpath3('//ContactInfo/a1/Prefix')]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[xpath3('//ContactInfo/a1/Suffix')]"/>
+             <add-message-property key="CUST-PHONE-NO" value="#[xpath3('//ContactInfo/a1/Phone')]"/>
+            <add-message-property key="SHIP-TO-MAIL-NAME" value="#[xpath3('//ContactInfo/a2/Name')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-1" value="#[xpath3('//ContactInfo/a2/AddressLine1')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-2" value="#[xpath3('//ContactInfo/a2/AddressLine2')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-3" value="#[xpath3('//ContactInfo/a2/AddressLine3')]"/>
+            <add-message-property key="SHIP-TO-MAIL-CITY" value="#[xpath3('//ContactInfo/a2/City')]"/>
+            <add-message-property key="SHIP-TO-MAIL-STATE" value="#[xpath3('//ContactInfo/a2/StateOrProvince')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ZIP" value="#[xpath3('//ContactInfo/a2/PostalCode')]"/>
+            <add-message-property key="SHIP-TO-SALES-CONTACT" value="#[xpath3('//ContactInfo/a3/Name')]"/>
+            <add-message-property key="SALES-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a3/Phone')]"/>
+            <add-message-property key="SHIP-TO-BUS-CONTACT" value="#[xpath3('//ContactInfo/a4/Name')]"/>
+            <add-message-property key="BUS-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a4/Phone')]"/>
+            <add-message-property key="SHIP-TO-DELIV-CONTACT" value="#[xpath3('//ContactInfo/a5/Name')]"/>
+            <add-message-property key="DELIV-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a5/Phone')]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT" value="#[xpath3('//ContactInfo/a6/Name')]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT-PHON" value="#[xpath3('//ContactInfo/a6/Phone')]"/>
+        </message-properties-transformer>
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml 
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+Trim: { (payload.*PartyInformation map {
+UNIQUE-ID:$.Local.SalesforceIdentifier ++ generate(' ', 18 - sizeOf $.Local.SalesforceIdentifier) when ((sizeOf $.Local.SalesforceIdentifier) > 0 ) otherwise  $.Local.SalesforceIdentifier ++ generate('~', 18 - sizeOf $.Local.SalesforceIdentifier)  ,
+USERID:flowVars.DCSId,
+SALES-OFFICE:$.Local.SalesOffice ++ generate(' ', 2 - sizeOf $.Local.SalesOffice) when ((sizeOf $.Local.SalesOffice) > 0 ) otherwise  $.Local.SalesOffice ++ generate('~', 2 - sizeOf $.Local.SalesOffice),
+WAREHOUSE:$.Local.WarehouseName  ++ generate(' ', 2 - sizeOf $.Local.WarehouseName ) when ((sizeOf $.Local.WarehouseName ) > 0 ) otherwise  $.Local.WarehouseName  ++ generate('~', 2 - sizeOf $.Local.WarehouseName),
+CUST-NUMBER: $.PartyIdentifier,
+CUST-SHIP-TO-SUFFIX:flowVars.CUST-SHIP-TO-SUFFIX,
+BILL-TO-SHORT-NAME:flowVars.BILL-TO-SHORT-NAME,
+AUTO-CR-COD-FLAG:$.Local.AutoCreditCodeFlag ++ generate('~', 1 - sizeOf $.Local.AutoCreditCodeFlag) when ((sizeOf $.Local.AutoCreditCodeFlag ) > 0 ) otherwise  $.Local.AutoCreditCodeFlag  ++ generate('~', 1 - sizeOf $.Local.AutoCreditCodeFlag),
+BILL-TO-NAME:$.Name  ++ generate(' ', 25 - sizeOf $.Name) when ((sizeOf $.Name) > 0 ) otherwise  $.Name ++ generate('~', 25)  ,
+AUTO-CR-DEPT:$.Local.AutoCreditDepartment ++ generate(' ', 2 - sizeOf $.Local.AutoCreditDepartment)  when ((sizeOf $.Local.AutoCreditDepartment ) > 0 ) otherwise  $.Local.AutoCreditDepartment  ++ generate('~', 2 - sizeOf $.Local.AutoCreditDepartment),
+BILL-TO-ADDR-1:flowVars.BILL-TO-ADDR-1,
+BILL-TO-ADDR-2:flowVars.BILL-TO-ADDR-2,
+BILL-TO-ADDR-3:flowVars.BILL-TO-ADDR-3,
+BILL-TO-CITY:flowVars.BILL-TO-CITY,
+BILL-TO-STATE:flowVars.BILL-TO-STATE,
+BILL-TO-ZIP:flowVars.BILL-TO-ZIP,
+CUST-TYPE-CODE:$.Local.CustomerTypeCode ++ generate(' ', 2 - sizeOf $.Local.CustomerTypeCode) when ((sizeOf $.Local.CustomerTypeCode ) > 0 ) otherwise  $.Local.CustomerTypeCode  ++ generate('~', 2 - sizeOf $.Local.CustomerTypeCode) ,
+BILL-TO-CONTACT:flowVars.BILL-TO-CONTACT,
+BILL-TO-TITLE:flowVars.BILL-TO-TITLE,
+NATIONAL-ACCOUNT:$.AccountType.AccountNumber ++ generate('~', 4 - sizeOf $.AccountType.AccountNumber),
+BILL-TO-PHONE:flowVars.BILL-TO-PHONE,
+SERVICE-BRANCH:$.AccountType.Region ++ generate(' ', 2 - sizeOf $.AccountType.Region) when ((sizeOf $.AccountType.Region) > 0 ) otherwise  $.AccountType.Region  ++ generate('~', 2 - sizeOf $.AccountType.Region) ,
+SHIP-TO-NAME:flowVars.SHIP-TO-NAME,
+SHIP-TO-MAIL-NAME:flowVars.SHIP-TO-MAIL-NAME,
+SHIP-TO-ADDR-1:flowVars.SHIP-TO-ADDR-1,
+SHIP-TO-MAIL-ADDR-1:flowVars.SHIP-TO-MAIL-ADDR-1,
+SHIP-TO-ADDR-2:flowVars.SHIP-TO-ADDR-2,
+SHIP-TO-MAIL-ADDR-2:flowVars.SHIP-TO-MAIL-ADDR-2,
+SHIP-TO-ADDR-3:flowVars.SHIP-TO-ADDR-3,
+SHIP-TO-MAIL-ADDR-3:flowVars.SHIP-TO-MAIL-ADDR-3,
+SHIP-TO-CITY:flowVars.SHIP-TO-CITY,
+SHIP-TO-STATE:flowVars.SHIP-TO-STATE,
+SHIP-TO-ZIP:flowVars.SHIP-TO-ZIP,
+SHIP-TO-MAIL-CITY:flowVars.SHIP-TO-MAIL-CITY,
+SHIP-TO-MAIL-STATE:flowVars.SHIP-TO-MAIL-STATE,
+SHIP-TO-MAIL-ZIP:flowVars.SHIP-TO-MAIL-ZIP,
+CUST-PHONE-NO:flowVars.CUST-PHONE-NO  ,
+SHIP-TO-FAX-NUM:flowVars.SHIP-TO-FAX-NUM,
+SHIP-TO-CNTY-CODE:flowVars.SHIP-TO-CNTY-CODE,
+SHIP-TO-ALIAS-1:$.Local.ShipToAlias-1 ++ generate(' ', 11 - sizeOf $.Local.ShipToAlias-1) when ((sizeOf $.Local.ShipToAlias-1) > 0 ) otherwise  $.Local.ShipToAlias-1  ++ generate('~', 11 - sizeOf $.Local.ShipToAlias-1) ,
+SHIP-TO-ALIAS-2:$.Local.ShipToAlias-2 ++ generate(' ', 11 - sizeOf $.Local.ShipToAlias-2) when ((sizeOf $.Local.ShipToAlias-1) > 0 ) otherwise  $.Local.ShipToAlias-2  ++ generate('~', 11 - sizeOf $.Local.ShipToAlias-2) ,
+FED-EPA-NUMBER:flowVars.FED-EPA-NUMBER,
+STATE-ID-1:flowVars.STATE-ID-1,
+STATE-EPA-NUMBER:flowVars.STATE-EPA-NUMBER,
+STATE-ID-2:flowVars.STATE-ID-2,
+STATE-EPA-NUMBER-2:flowVars.STATE-EPA-NUMBER-2 ,
+CUST-SHIP-VIA-CODE:$.Local.ShipVia ++ generate(' ', 4 - sizeOf $.Local.ShipVia) when ((sizeOf $.Local.ShipVia) > 0 ) otherwise  $.Local.ShipVia  ++ generate('~', 4 - sizeOf $.Local.ShipVia) ,
+CUST-SHIP-TERMS-CODE:$.Local.ShipTerms ++ generate(' ', 2 - sizeOf $.Local.ShipTerms) when ((sizeOf $.Local.ShipTerms) > 0 ) otherwise  $.Local.ShipTerms  ++ generate('~', 2 - sizeOf $.Local.ShipTerms) ,
+SHIP-TO-DEPT-01:$.Local.ShipToDepartment ++ generate(' ', 2 - sizeOf $.Local.ShipToDepartment) when ((sizeOf $.Local.ShipToDepartment) > 0 ) otherwise  $.Local.ShipToDepartment  ++ generate('~', 2 - sizeOf $.Local.ShipToDepartment) ,
+CUST-SLSMN1-CODE:flowVars.CUST-SLSMN1-CODE,
+PCS-LICENSE-NUMBER:$.Local.PCSLicenseNumber ++ generate(' ', 15 - sizeOf $.Local.PCSLicenseNumber) when ((sizeOf $.Local.PCSLicenseNumber) > 0 ) otherwise  $.Local.PCSLicenseNumber ++ generate('~', 15 - sizeOf $.Local.PCSLicenseNumber) ,
+PCS-EXPIRE-DATE:$.Local.PCSExpiryDate ++ generate('~', 8 - sizeOf $.Local.PCSExpiryDate) ,
+PCS-LIC-NAME:$.Local.PCSLicenseName ++ generate(' ', 25 - sizeOf $.Local.PCSLicenseName) when ((sizeOf $.Local.PCSLicenseName) > 0 ) otherwise  $.Local.PCSLicenseName  ++ generate('~', 25 - sizeOf $.Local.PCSLicenseName) ,
+STWRD-EXP-DATE:$.Local.STWRDExpiryDate ++ generate('~', 8 - sizeOf $.Local.STWRDExpiryDate) ,
+CUST-TAX-EXEPT-CERT-NO:$.TaxInformation.TaxCertificateNumber ++ generate(' ', 20 - sizeOf $.TaxInformation.TaxCertificateNumber) when ((sizeOf $.TaxInformation.TaxCertificateNumber) > 0 ) otherwise  $.TaxInformation.TaxCertificateNumber  ++ generate('~', 20 - sizeOf $.TaxInformation.TaxCertificateNumber) ,
+TAX-EXEPT-EXPR-DT:$.TaxInformation.ExpiryDate ++ generate(' ', 8 - sizeOf $.TaxInformation.ExpiryDate) when ((sizeOf $.TaxInformation.ExpiryDate) > 0 ) otherwise  $.TaxInformation.ExpiryDate  ++ generate('~', 8 - sizeOf $.TaxInformation.ExpiryDate) ,
+COMB-TABLE-CODE:$.Local.CombTableCode ++ generate(' ', 4 - sizeOf $.Local.CombTableCode) when ((sizeOf $.Local.CombTableCode) > 0 ) otherwise  $.Local.CombTableCode  ++ generate('~', 4 - sizeOf $.Local.CombTableCode) ,
+SHIP-TO-CONTAINER-DE:$.Local.ShipToContainer ++ generate(' ', 1 - sizeOf $.Local.ShipToContainer) when ((sizeOf $.Local.ShipToContainer) > 0 ) otherwise  $.Local.ShipToContainer  ++ generate('~', 1 - sizeOf $.Local.ShipToContainer) ,
+PRINT-PRICE-FLAG:$.Local.PrintPriceFlag  ++ generate(' ', 1 - sizeOf $.Local.PrintPriceFlag ) when ((sizeOf $.Local.PrintPriceFlag ) > 0 ) otherwise  $.Local.PrintPriceFlag   ++ generate('~', 1 - sizeOf $.Local.PrintPriceFlag) ,
+PRIME-DELIV-METHOD:$.Local.PrimaryDeliveryMethod ++ generate(' ', 2 - sizeOf $.Local.PrimaryDeliveryMethod) when ((sizeOf $.Local.PrimaryDeliveryMethod) > 0 ) otherwise  $.Local.PrimaryDeliveryMethod  ++ generate('~', 2 - sizeOf $.Local.PrimaryDeliveryMethod) ,
+CUST-ORDR-FILL-CODE:$.Local.ShipmentIndicatorCode  ++ generate(' ', 1 - sizeOf $.Local.ShipmentIndicatorCode ) when ((sizeOf $.Local.ShipmentIndicatorCode) > 0 ) otherwise  $.Local.ShipmentIndicatorCode  ++ generate('~', 1 - sizeOf $.Local.ShipmentIndicatorCode) ,
+MAIL-INV-FLAG:$.Local.MailInvoiceFlag ++ generate(' ', 1 - sizeOf $.Local.MailInvoiceFlag) when ((sizeOf $.Local.MailInvoiceFlag) > 0 ) otherwise  $.Local.MailInvoiceFlag  ++ generate('~', 1 - sizeOf $.Local.MailInvoiceFlag) ,
+CUST-CLASS-CODE:$.Local.CustomerClassCode ++ generate(' ', 3 - sizeOf $.Local.CustomerClassCode) when ((sizeOf $.Local.CustomerClassCode) > 0 ) otherwise  $.Local.CustomerClassCode  ++ generate('~', 3 - sizeOf $.Local.CustomerClassCode) ,
+SINGLE-LOT-FLAG:$.Local.SingleLotFlag ++ generate(' ', 1 - sizeOf $.Local.SingleLotFlag) when ((sizeOf $.Local.SingleLotFlag) > 0 ) otherwise  $.Local.SingleLotFlag  ++ generate('~', 1 - sizeOf $.Local.SingleLotFlag) ,
+EXPORTER-FLAG:$.Local.ExporterFlag ++ generate(' ', 1 - sizeOf $.Local.ExporterFlag) when ((sizeOf $.Local.ExporterFlag) > 0 ) otherwise  $.Local.ExporterFlag  ++ generate('~', 1 - sizeOf $.Local.ExporterFlag) ,
+SHIP-TO-SALUTATION:flowVars.SHIP-TO-SALUTATION,
+SHIP-TO-SALES-CONTACT:flowVars.SHIP-TO-SALES-CONTACT,
+SALES-CONTACT-PHONE:flowVars.SALES-CONTACT-PHONE,
+SHIP-TO-BUS-CONTACT:flowVars.SHIP-TO-BUS-CONTACT,
+BUS-CONTACT-PHONE:flowVars.BUS-CONTACT-PHONE,
+SHIP-TO-DELIV-CONTACT:flowVars.SHIP-TO-DELIV-CONTACT,
+DELIV-CONTACT-PHONE:flowVars.DELIV-CONTACT-PHONE,
+SHIP-TO-TECH-CONTACT:flowVars.SHIP-TO-TECH-CONTACT,
+SHIP-TO-TECH-CONTACT-PHON:flowVars.SHIP-TO-TECH-CONTACT-PHON 
+}
+)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="BILL-TO-SHORT-NAME" value="#[flowVars['BILL-TO-SHORT-NAME'].substring(0,10)]"/>
+            
+            <add-message-property key="BILL-TO-ADDR-1" value="#[flowVars['BILL-TO-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-ADDR-2" value="#[flowVars['BILL-TO-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-ADDR-3" value="#[flowVars['BILL-TO-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-CITY" value="#[flowVars['BILL-TO-CITY'].substring(0,12)]"/>
+            <add-message-property key="BILL-TO-STATE" value="#[flowVars['BILL-TO-STATE'].substring(0,2)]"/>
+            <add-message-property key="BILL-TO-ZIP" value="#[flowVars['BILL-TO-ZIP'].substring(0,9)]"/>
+            <add-message-property key="BILL-TO-CONTACT" value="#[flowVars['BILL-TO-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-TITLE" value="#[flowVars['BILL-TO-TITLE'].substring(0,20)]"/>
+            <add-message-property key="BILL-TO-PHONE" value="#[flowVars['BILL-TO-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-NAME" value="#[flowVars['SHIP-TO-NAME'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-1" value="#[flowVars['SHIP-TO-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-2" value="#[flowVars['SHIP-TO-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-3" value="#[flowVars['SHIP-TO-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-CITY" value="#[flowVars['SHIP-TO-CITY'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-STATE" value="#[flowVars['SHIP-TO-STATE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-ZIP" value="#[flowVars['SHIP-TO-ZIP'].substring(0,9)]"/>
+            <add-message-property key="SHIP-TO-FAX-NUM" value="#[flowVars['SHIP-TO-FAX-NUM'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-CNTY-CODE" value="#[flowVars['SHIP-TO-CNTY-CODE'].substring(0,3)]"/>
+            <add-message-property key="SHIP-TO-SALUTATION" value="#[flowVars['SHIP-TO-SALUTATION'].substring(0,15)]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[flowVars['CUST-SHIP-TO-SUFFIX'].substring(0,3)]"/>
+            <add-message-property key="SHIP-TO-MAIL-NAME" value="#[flowVars['SHIP-TO-MAIL-NAME'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-1" value="#[flowVars['SHIP-TO-MAIL-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-2" value="#[flowVars['SHIP-TO-MAIL-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-3" value="#[flowVars['SHIP-TO-MAIL-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-CITY" value="#[flowVars['SHIP-TO-MAIL-CITY'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-MAIL-STATE" value="#[flowVars['SHIP-TO-MAIL-STATE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ZIP" value="#[flowVars['SHIP-TO-MAIL-ZIP'].substring(0,9)]"/>
+            <add-message-property key="SHIP-TO-SALES-CONTACT" value="#[flowVars['SHIP-TO-SALES-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="SALES-CONTACT-PHONE" value="#[flowVars['SALES-CONTACT-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-BUS-CONTACT" value="#[flowVars['SHIP-TO-BUS-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="BUS-CONTACT-PHONE" value="#[flowVars['BUS-CONTACT-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-DELIV-CONTACT" value="#[flowVars['SHIP-TO-DELIV-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="DELIV-CONTACT-PHONE" value="#[flowVars['DELIV-CONTACT-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT" value="#[flowVars['SHIP-TO-TECH-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT-PHON" value="#[flowVars['SHIP-TO-TECH-CONTACT-PHON'].substring(0,12)]"/>
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="test" value="4"/>
+            <add-message-property key="UNIQUE-ID" value="#[xpath3('//Trim/UNIQUE-ID')]"/>
+            <add-message-property key="SALES-OFFICE" value="#[xpath3('//Trim/SALES-OFFICE')]"/>
+            <add-message-property key="WAREHOUSE" value="#[xpath3('//Trim/WAREHOUSE')]"/>
+            <add-message-property key="BILL-TO-NAME" value="#[xpath3('//Trim/BILL-TO-NAME')]"/>
+            <add-message-property key="CUST-NUMBER" value="#[xpath3('//Trim/CUST-NUMBER')]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[xpath3('//Trim/CUST-SHIP-TO-SUFFIX')]"/>
+            <add-message-property key="AUTO-CR-COD-FLAG" value="#[xpath3('//Trim/AUTO-CR-COD-FLAG')]"/>
+            <add-message-property key="AUTO-CR-DEPT" value="#[xpath3('//Trim/AUTO-CR-DEPT')]"/>
+            <add-message-property key="CUST-TYPE-CODE" value="#[xpath3('//Trim/CUST-TYPE-CODE')]"/>
+            <add-message-property key="NATIONAL-ACCOUNT" value="#[xpath3('//Trim/NATIONAL-ACCOUNT')]"/>
+            <add-message-property key="SERVICE-BRANCH" value="#[xpath3('//Trim/SERVICE-BRANCH')]"/>
+            
+            <add-message-property key="SHIP-TO-ALIAS-1" value="#[xpath3('//Trim/SHIP-TO-ALIAS-1')]"/>
+            <add-message-property key="SHIP-TO-ALIAS-2" value="#[xpath3('//Trim/SHIP-TO-ALIAS-2')]"/>
+            <add-message-property key="CUST-SHIP-VIA-CODE" value="#[xpath3('//Trim/CUST-SHIP-VIA-CODE')]"/>
+            <add-message-property key="CUST-SHIP-TERMS-CODE" value="#[xpath3('//Trim/CUST-SHIP-TERMS-CODE')]"/>
+            <add-message-property key="SHIP-TO-DEPT-01" value="#[xpath3('//Trim/SHIP-TO-DEPT-01')]"/>
+            <add-message-property key="PCS-LICENSE-NUMBER" value="#[xpath3('//Trim/PCS-LICENSE-NUMBER')]"/>
+            <add-message-property key="PCS-EXPIRE-DATE" value="#[xpath3('//Trim/PCS-EXPIRE-DATE')]"/>
+            <add-message-property key="PCS-LIC-NAME" value="#[xpath3('//Trim/PCS-LIC-NAME')]"/>
+            <add-message-property key="STWRD-EXP-DATE" value="#[xpath3('//Trim/STWRD-EXP-DATE')]"/>
+            <add-message-property key="CUST-TAX-EXEPT-CERT-NO" value="#[xpath3('//Trim/CUST-TAX-EXEPT-CERT-NO')]"/>
+            <add-message-property key="TAX-EXEPT-EXPR-DT" value="#[xpath3('//Trim/TAX-EXEPT-EXPR-DT')]"/>
+            <add-message-property key="COMB-TABLE-CODE" value="#[xpath3('//Trim/COMB-TABLE-CODE')]"/>
+            <add-message-property key="SHIP-TO-CONTAINER-DE" value="#[xpath3('//Trim/SHIP-TO-CONTAINER-DE')]"/>
+            <add-message-property key="PRINT-PRICE-FLAG" value="#[xpath3('//Trim/PRINT-PRICE-FLAG')]"/>
+            <add-message-property key="PRIME-DELIV-METHOD" value="#[xpath3('//Trim/PRIME-DELIV-METHOD')]"/>
+            <add-message-property key="CUST-ORDR-FILL-CODE" value="#[xpath3('//Trim/CUST-ORDR-FILL-CODE')]"/>
+            <add-message-property key="MAIL-INV-FLAG" value="#[xpath3('//Trim/MAIL-INV-FLAG')]"/>
+            <add-message-property key="CUST-CLASS-CODE" value="#[xpath3('//Trim/CUST-CLASS-CODE')]"/>
+            <add-message-property key="SINGLE-LOT-FLAG" value="#[xpath3('//Trim/SINGLE-LOT-FLAG')]"/>
+            <add-message-property key="EXPORTER-FLAG" value="#[xpath3('//Trim/EXPORTER-FLAG')]"/>
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="UNIQUE-ID" value="#[flowVars['UNIQUE-ID'].substring(0,18)]"/>
+            <add-message-property key="SALES-OFFICE" value="#[flowVars['SALES-OFFICE'].substring(0,2)]"/>
+            <add-message-property key="WAREHOUSE" value="#[flowVars['WAREHOUSE'].substring(0,2)]"/>
+            <add-message-property key="BILL-TO-NAME" value="#[flowVars['BILL-TO-NAME'].substring(0,25)]"/>
+            <add-message-property key="CUST-NUMBER" value="#[flowVars['CUST-NUMBER'].substring(0,6)]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[flowVars['CUST-SHIP-TO-SUFFIX'].substring(0,3)]"/>
+            <add-message-property key="AUTO-CR-COD-FLAG" value="#[flowVars['AUTO-CR-COD-FLAG'].substring(0,1)]"/>
+            <add-message-property key="AUTO-CR-DEPT" value="#[flowVars['AUTO-CR-DEPT'].substring(0,2)]"/>
+            <add-message-property key="CUST-TYPE-CODE" value="#[flowVars['CUST-TYPE-CODE'].substring(0,2)]"/>
+            <add-message-property key="NATIONAL-ACCOUNT" value="#[flowVars['NATIONAL-ACCOUNT'].substring(0,4)]"/>
+            <add-message-property key="SERVICE-BRANCH" value="#[flowVars['SERVICE-BRANCH'].substring(0,2)]"/>
+            <add-message-property key="CUST-PHONE-NO" value="#[flowVars['CUST-PHONE-NO'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-ALIAS-1" value="#[flowVars['SHIP-TO-ALIAS-1'].substring(0,11)]"/>
+            <add-message-property key="SHIP-TO-ALIAS-2" value="#[flowVars['SHIP-TO-ALIAS-2'].substring(0,11)]"/>
+            <add-message-property key="CUST-SHIP-VIA-CODE" value="#[flowVars['CUST-SHIP-VIA-CODE'].substring(0,4)]"/>
+            <add-message-property key="CUST-SHIP-TERMS-CODE" value="#[flowVars['CUST-SHIP-TERMS-CODE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-DEPT-01" value="#[flowVars['SHIP-TO-DEPT-01'].substring(0,2)]"/>
+            <add-message-property key="PCS-LICENSE-NUMBER" value="#[flowVars['PCS-LICENSE-NUMBER'].substring(0,15)]"/>
+            <add-message-property key="PCS-EXPIRE-DATE" value="#[flowVars['PCS-EXPIRE-DATE'].substring(0,8)]"/>
+            <add-message-property key="PCS-LIC-NAME" value="#[flowVars['PCS-LIC-NAME'].substring(0,25)]"/>
+            <add-message-property key="STWRD-EXP-DATE" value="#[flowVars['STWRD-EXP-DATE'].substring(0,8)]"/>
+            <add-message-property key="CUST-TAX-EXEPT-CERT-NO" value="#[flowVars['CUST-TAX-EXEPT-CERT-NO'].substring(0,20)]"/>
+            <add-message-property key="TAX-EXEPT-EXPR-DT" value="#[flowVars['TAX-EXEPT-EXPR-DT'].substring(0,8)]"/>
+            <add-message-property key="COMB-TABLE-CODE" value="#[flowVars['COMB-TABLE-CODE'].substring(0,4)]"/>
+            <add-message-property key="SHIP-TO-CONTAINER-DE" value="#[flowVars['SHIP-TO-CONTAINER-DE'].substring(0,1)]"/>
+            <add-message-property key="PRINT-PRICE-FLAG" value="#[flowVars['PRINT-PRICE-FLAG'].substring(0,1)]"/>
+            <add-message-property key="PRIME-DELIV-METHOD" value="#[flowVars['PRIME-DELIV-METHOD'].substring(0,2)]"/>
+            <add-message-property key="CUST-ORDR-FILL-CODE" value="#[flowVars['CUST-ORDR-FILL-CODE'].substring(0,1)]"/>
+            <add-message-property key="MAIL-INV-FLAG" value="#[flowVars['MAIL-INV-FLAG'].substring(0,1)]"/>
+            <add-message-property key="CUST-CLASS-CODE" value="#[flowVars['CUST-CLASS-CODE'].substring(0,3)]"/>
+            <add-message-property key="SINGLE-LOT-FLAG" value="#[flowVars['SINGLE-LOT-FLAG'].substring(0,1)]"/>
+            <add-message-property key="EXPORTER-FLAG" value="#[flowVars['EXPORTER-FLAG'].substring(0,1)]"/>
+            <add-message-property key="FED-EPA-NUMBER" value="#[flowVars['FED-EPA-NUMBER'].substring(0,12)]"/>
+            <add-message-property key="STATE-EPA-NUMBER" value="#[flowVars['STATE-EPA-NUMBER'].substring(0,12)]"/>
+            <add-message-property key="STATE-EPA-NUMBER-2" value="#[flowVars['STATE-EPA-NUMBER-2'].substring(0,12)]"/>
+            <add-message-property key="STATE-ID-1" value="#[flowVars['STATE-ID-1'].substring(0,2)]"/>
+            <add-message-property key="STATE-ID-2" value="#[flowVars['STATE-ID-2'].substring(0,2)]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false, separator="|", escape="<"
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+UNIQUE-ID:flowVars.UNIQUE-ID,
+USERID:flowVars.DCSId,
+SALES-OFFICE:flowVars.SALES-OFFICE,
+WAREHOUSE:flowVars.WAREHOUSE,
+CUST-NUMBER:flowVars.CUST-NUMBER,
+CUST-SHIP-TO-SUFFIX:generate('~',3),
+BILL-TO-SHORT-NAME:generate('~',10),
+AUTO-CR-COD-FLAG: generate('~', 1) ,
+BILL-TO-NAME:generate('~',25),
+AUTO-CR-DEPT:generate('~', 2) ,
+BILL-TO-ADDR-1:generate('~',25),
+BILL-TO-ADDR-2:generate('~',25),
+BILL-TO-ADDR-3:generate('~',25),
+BILL-TO-CITY:generate('~',12),
+BILL-TO-STATE:generate('~',2),
+BILL-TO-ZIP:generate('~',9),
+CUST-TYPE-CODE:generate('~',2),
+BILL-TO-CONTACT:generate('~',25),
+BILL-TO-TITLE:generate('~',20),
+NATIONAL-ACCOUNT:generate('~',4),
+BILL-TO-PHONE:generate('~',12),
+SERVICE-BRANCH:flowVars.SERVICE-BRANCH,
+SHIP-TO-NAME:flowVars.SHIP-TO-NAME,
+SHIP-TO-MAIL-NAME:flowVars.SHIP-TO-MAIL-NAME,
+SHIP-TO-ADDR-1:flowVars.SHIP-TO-ADDR-1,
+SHIP-TO-MAIL-ADDR-1:flowVars.SHIP-TO-MAIL-ADDR-1,
+SHIP-TO-ADDR-2:flowVars.SHIP-TO-ADDR-2,
+SHIP-TO-MAIL-ADDR-2:flowVars.SHIP-TO-MAIL-ADDR-2,
+SHIP-TO-ADDR-3:flowVars.SHIP-TO-ADDR-3,
+SHIP-TO-MAIL-ADDR-3:flowVars.SHIP-TO-MAIL-ADDR-3,
+SHIP-TO-CITY:flowVars.SHIP-TO-CITY,
+SHIP-TO-STATE:flowVars.SHIP-TO-STATE,
+SHIP-TO-ZIP:flowVars.SHIP-TO-ZIP,
+SHIP-TO-MAIL-CITY:flowVars.SHIP-TO-MAIL-CITY,
+SHIP-TO-MAIL-STATE:flowVars.SHIP-TO-MAIL-STATE,
+SHIP-TO-MAIL-ZIP:flowVars.SHIP-TO-MAIL-ZIP,
+CUST-PHONE-NO:flowVars.CUST-PHONE-NO,
+SHIP-TO-FAX-NUM:flowVars.SHIP-TO-FAX-NUM,
+SHIP-TO-CNTY-CODE:flowVars.SHIP-TO-CNTY-CODE,
+SHIP-TO-ALIAS-1:flowVars.SHIP-TO-ALIAS-1,
+SHIP-TO-ALIAS-2:flowVars.SHIP-TO-ALIAS-2,
+FED-EPA-NUMBER:flowVars.FED-EPA-NUMBER,
+STATE-ID-1:flowVars.STATE-ID-1,
+STATE-EPA-NUMBER:flowVars.STATE-EPA-NUMBER,
+STATE-ID-2:flowVars.STATE-ID-2,
+STATE-EPA-NUMBER-2:( flowVars.STATE-EPA-NUMBER-2  ++ generate(' ', 3) unless (flowVars.STATE-EPA-NUMBER-2 == "~~~~~~~~~~~~") otherwise  generate('~',3) ) ,
+CUST-SHIP-VIA-CODE:flowVars.CUST-SHIP-VIA-CODE,
+CUST-SHIP-TERMS-CODE:flowVars.CUST-SHIP-TERMS-CODE,
+SHIP-TO-DEPT-01:flowVars.SHIP-TO-DEPT-01,
+CUST-SLSMN1-CODE:flowVars.CUST-SLSMN1-CODE,
+PCS-LICENSE-NUMBER:flowVars.PCS-LICENSE-NUMBER,
+PCS-EXPIRE-DATE:flowVars.PCS-EXPIRE-DATE,
+PCS-LIC-NAME:flowVars.PCS-LIC-NAME,
+STWRD-EXP-DATE:flowVars.STWRD-EXP-DATE,
+CUST-TAX-EXEPT-CERT-NO:flowVars.CUST-TAX-EXEPT-CERT-NO,
+TAX-EXEPT-EXPR-DT:flowVars.TAX-EXEPT-EXPR-DT,
+COMB-TABLE-CODE:flowVars.COMB-TABLE-CODE,
+SHIP-TO-CONTAINER-DE:flowVars.SHIP-TO-CONTAINER-DE,
+PRINT-PRICE-FLAG:flowVars.PRINT-PRICE-FLAG,
+PRIME-DELIV-METHOD:flowVars.PRIME-DELIV-METHOD,
+CUST-ORDR-FILL-CODE:flowVars.CUST-ORDR-FILL-CODE,
+MAIL-INV-FLAG:flowVars.MAIL-INV-FLAG,
+CUST-CLASS-CODE:flowVars.CUST-CLASS-CODE,
+SINGLE-LOT-FLAG:flowVars.SINGLE-LOT-FLAG,
+EXPORTER-FLAG:flowVars.EXPORTER-FLAG,
+SHIP-TO-SALUTATION:flowVars.SHIP-TO-SALUTATION,
+SHIP-TO-SALES-CONTACT:flowVars.SHIP-TO-SALES-CONTACT,
+SALES-CONTACT-PHONE:flowVars.SALES-CONTACT-PHONE,
+SHIP-TO-BUS-CONTACT:flowVars.SHIP-TO-BUS-CONTACT,
+BUS-CONTACT-PHONE:flowVars.BUS-CONTACT-PHONE,
+SHIP-TO-DELIV-CONTACT:flowVars.SHIP-TO-DELIV-CONTACT,
+DELIV-CONTACT-PHONE:flowVars.DELIV-CONTACT-PHONE,
+SHIP-TO-TECH-CONTACT:flowVars.SHIP-TO-TECH-CONTACT,
+SHIP-TO-TECH-CONTACT-PHON:flowVars.SHIP-TO-TECH-CONTACT-PHON 
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-payload value="#[payload.replaceAll(&quot;&lt;&quot;, &quot;&quot;).replaceAll(&quot;\r&quot;, &quot;&quot;).replaceAll(&quot;\n&quot;, &quot;&quot;).toString()]" mimeType="application/csv" doc:name="Set Payload"/>
+    </sub-flow>
+    <sub-flow name="UpdateShipToSub_Flow">
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+	EPAInfo: { (payload.PartyInformation.*EPAInformation map {
+        ("a$$"): {
+            EPANumber: $.EPANumber  ++ generate(' ', 12 - sizeOf $.EPANumber) when ((sizeOf $.EPANumber) > 0 ) otherwise  $.EPANumber  ++ generate('~', 12 - sizeOf $.EPANumber)  ,
+                        EPAID: $.EPAID ++ generate(' ', 2 - sizeOf $.EPAID)  when ((sizeOf $.EPAID) > 0 ) otherwise  $.EPAID  ++ generate('~', 2 - sizeOf $.EPAID)  
+        }
+    })
+    
+    }]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="FED-EPA-NUMBER" value="#[xpath3('//EPAInfo/a0/EPANumber')]"/>
+            <add-message-property key="STATE-EPA-NUMBER" value="#[xpath3('//EPAInfo/a1/EPANumber')]"/>
+            <add-message-property key="STATE-EPA-NUMBER-2" value="#[xpath3('//EPAInfo/a2/EPANumber')]"/>
+            <add-message-property key="STATE-ID-1" value="#[xpath3('//EPAInfo/a1/EPAID')]"/>
+            <add-message-property key="STATE-ID-2" value="#[xpath3('//EPAInfo/a2/EPAID')]"/>
+        </message-properties-transformer>
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+	ContactInfo: { (payload.PartyInformation.*contact map {
+        ("a$$"): {
+Type:$.Type ,
+Name:$.Name ++ generate(' ', 25 - sizeOf $.Name) when ((sizeOf $.Name) > 0 ) otherwise  $.Name  ++ generate('~', 25 - sizeOf $.Name) ,
+FirstName:$.FirstName ++ generate(' ', 25 - sizeOf $.FirstName) when ((sizeOf $.FirstName) > 0 ) otherwise  $.FirstName  ++ generate('~', 25 - sizeOf $.FirstName),
+LastName:$.LastName ++ generate(' ', 20 - sizeOf $.LastName) when ((sizeOf $.LastName) > 0 ) otherwise  $.LastName  ++ generate('~', 20 - sizeOf $.LastName),
+Fax:$.Fax ++ generate(' ', 12 - sizeOf $.Fax) when ((sizeOf $.Fax) > 0 ) otherwise  $.Fax  ++ generate('~', 12 - sizeOf $.Fax) ,
+Phone:$.Phone ++ generate(' ', 12 - sizeOf $.Phone) when ((sizeOf $.Phone) > 0 ) otherwise  $.Phone  ++ generate('~', 12 - sizeOf $.Phone),
+Prefix:$.Prefix ++ generate(' ', 15 - sizeOf $.Prefix) when ((sizeOf $.Prefix) > 0 ) otherwise  $.Prefix  ++ generate('~', 15 - sizeOf $.Prefix),
+ShortName:$.ShortName ++ generate(' ', 10 - sizeOf $.ShortName) when ((sizeOf $.ShortName) > 0 ) otherwise  $.ShortName  ++ generate('~', 10 - sizeOf $.ShortName),
+Suffix:$.Suffix ++ generate(' ', 3 - sizeOf $.Suffix) when ((sizeOf $.Suffix) > 0 ) otherwise  $.Suffix  ++ generate('~', 3 - sizeOf $.Suffix), 
+Title:$.Title ++ generate(' ', 20 - sizeOf $.Title) when ((sizeOf $.Title) > 0 ) otherwise  $.Title  ++ generate('~', 20 - sizeOf $.Title),
+AddressLine1:$.address.Line1 ++ generate(' ', 25 - sizeOf $.address.Line1) when ((sizeOf $.address.Line1) > 0 ) otherwise  $.address.Line1  ++ generate('~', 25 - sizeOf $.address.Line1),
+AddressLine2:$.address.Line2 ++ generate(' ', 25 - sizeOf $.address.Line2) when ((sizeOf $.address.Line2) > 0 ) otherwise  $.address.Line2  ++ generate('~', 25 - sizeOf $.address.Line2),
+AddressLine3:$.address.Line3 ++ generate(' ', 25 - sizeOf $.address.Line3) when ((sizeOf $.address.Line3) > 0 ) otherwise  $.address.Line3  ++ generate('~', 25 - sizeOf $.address.Line3),
+City :$.address.City  ++ generate(' ', 12 - sizeOf $.address.City ) when ((sizeOf $.address.City) > 0 ) otherwise  $.address.City  ++ generate('~', 12 - sizeOf $.address.City),
+County:$.address.County ++ generate(' ', 3 - sizeOf $.address.County) when ((sizeOf $.address.County) > 0 ) otherwise  $.address.County  ++ generate('~', 3 - sizeOf $.address.County),
+PostalCode:$.address.PostalCode ++ generate(' ',9- sizeOf $.address.PostalCode) when ((sizeOf $.address.PostalCode) > 0 ) otherwise  $.address.PostalCode  ++ generate('~', 9 - sizeOf $.address.PostalCode),
+StateOrProvince: $.address.State ++ generate(' ', 2 - sizeOf $.address.State) when ((sizeOf $.address.State) > 0 ) otherwise  $.address.State  ++ generate('~', 2 - sizeOf $.address.State)
+        }
+    })
+    
+    }]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="BILL-TO-SHORT-NAME" value="#[xpath3('//ContactInfo/a0/ShortName')]"/>
+            
+            <add-message-property key="BILL-TO-ADDR-1" value="#[xpath3('//ContactInfo/a0/AddressLine1')]"/>
+            <add-message-property key="BILL-TO-ADDR-2" value="#[xpath3('//ContactInfo/a0/AddressLine2')]"/>
+            <add-message-property key="BILL-TO-ADDR-3" value="#[xpath3('//ContactInfo/a0/AddressLine3')]"/>
+            <add-message-property key="BILL-TO-CITY" value="#[xpath3('//ContactInfo/a0/City')]"/>
+            <add-message-property key="BILL-TO-STATE" value="#[xpath3('//ContactInfo/a0/StateOrProvince')]"/>
+            <add-message-property key="BILL-TO-ZIP" value="#[xpath3('//ContactInfo/a0/PostalCode')]"/>
+            <add-message-property key="BILL-TO-CONTACT" value="#[xpath3('//ContactInfo/a0/Name')]"/>
+            <add-message-property key="BILL-TO-TITLE" value="#[xpath3('//ContactInfo/a0/Title')]"/>
+            <add-message-property key="BILL-TO-PHONE" value="#[xpath3('//ContactInfo/a0/Phone')]"/>
+            <add-message-property key="SHIP-TO-NAME" value="#[xpath3('//ContactInfo/a1/Name')]"/>
+            <add-message-property key="SHIP-TO-ADDR-1" value="#[xpath3('//ContactInfo/a1/AddressLine1')]"/>
+            <add-message-property key="SHIP-TO-ADDR-2" value="#[xpath3('//ContactInfo/a1/AddressLine2')]"/>
+            <add-message-property key="SHIP-TO-ADDR-3" value="#[xpath3('//ContactInfo/a1/AddressLine3')]"/>
+            <add-message-property key="SHIP-TO-CITY" value="#[xpath3('//ContactInfo/a1/City')]"/>
+            <add-message-property key="SHIP-TO-STATE" value="#[xpath3('//ContactInfo/a1/StateOrProvince')]"/>
+            <add-message-property key="SHIP-TO-ZIP" value="#[xpath3('//ContactInfo/a1/PostalCode')]"/>
+            <add-message-property key="SHIP-TO-FAX-NUM" value="#[xpath3('//ContactInfo/a1/Fax')]"/>
+            <add-message-property key="SHIP-TO-CNTY-CODE" value="#[xpath3('//ContactInfo/a1/County')]"/>
+            <add-message-property key="SHIP-TO-SALUTATION" value="#[xpath3('//ContactInfo/a1/Prefix')]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[xpath3('//ContactInfo/a1/Suffix')]"/>
+             <add-message-property key="CUST-PHONE-NO" value="#[xpath3('//ContactInfo/a1/Phone')]"/>
+            <add-message-property key="SHIP-TO-MAIL-NAME" value="#[xpath3('//ContactInfo/a2/Name')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-1" value="#[xpath3('//ContactInfo/a2/AddressLine1')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-2" value="#[xpath3('//ContactInfo/a2/AddressLine2')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-3" value="#[xpath3('//ContactInfo/a2/AddressLine3')]"/>
+            <add-message-property key="SHIP-TO-MAIL-CITY" value="#[xpath3('//ContactInfo/a2/City')]"/>
+            <add-message-property key="SHIP-TO-MAIL-STATE" value="#[xpath3('//ContactInfo/a2/StateOrProvince')]"/>
+            <add-message-property key="SHIP-TO-MAIL-ZIP" value="#[xpath3('//ContactInfo/a2/PostalCode')]"/>
+            <add-message-property key="SHIP-TO-SALES-CONTACT" value="#[xpath3('//ContactInfo/a3/Name')]"/>
+            <add-message-property key="SALES-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a3/Phone')]"/>
+            <add-message-property key="SHIP-TO-BUS-CONTACT" value="#[xpath3('//ContactInfo/a4/Name')]"/>
+            <add-message-property key="BUS-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a4/Phone')]"/>
+            <add-message-property key="SHIP-TO-DELIV-CONTACT" value="#[xpath3('//ContactInfo/a5/Name')]"/>
+            <add-message-property key="DELIV-CONTACT-PHONE" value="#[xpath3('//ContactInfo/a5/Phone')]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT" value="#[xpath3('//ContactInfo/a6/Name')]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT-PHON" value="#[xpath3('//ContactInfo/a6/Phone')]"/>
+        </message-properties-transformer>
+        <set-payload value="#[flowVars.OrgPayload]" mimeType="application/xml" doc:name="Set Payload"/>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%input payload application/xml 
+%output application/xml
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+Trim: { (payload.*PartyInformation map {
+UNIQUE-ID:$.Local.SalesforceIdentifier ++ generate(' ', 18 - sizeOf $.Local.SalesforceIdentifier) when ((sizeOf $.Local.SalesforceIdentifier) > 0 ) otherwise  $.Local.SalesforceIdentifier ++ generate('~', 18 - sizeOf $.Local.SalesforceIdentifier)  ,
+USERID:flowVars.DCSId,
+SALES-OFFICE:$.Local.SalesOffice ++ generate(' ', 2 - sizeOf $.Local.SalesOffice) when ((sizeOf $.Local.SalesOffice) > 0 ) otherwise  $.Local.SalesOffice ++ generate('~', 2 - sizeOf $.Local.SalesOffice),
+WAREHOUSE:$.Local.WarehouseName  ++ generate(' ', 2 - sizeOf $.Local.WarehouseName ) when ((sizeOf $.Local.WarehouseName ) > 0 ) otherwise  $.Local.WarehouseName  ++ generate('~', 2 - sizeOf $.Local.WarehouseName),
+CUST-NUMBER: $.PartyIdentifier,
+CUST-SHIP-TO-SUFFIX:flowVars.CUST-SHIP-TO-SUFFIX,
+BILL-TO-SHORT-NAME:flowVars.BILL-TO-SHORT-NAME,
+AUTO-CR-COD-FLAG:$.Local.AutoCreditCodeFlag ++ generate('~', 1 - sizeOf $.Local.AutoCreditCodeFlag) when ((sizeOf $.Local.AutoCreditCodeFlag ) > 0 ) otherwise  $.Local.AutoCreditCodeFlag  ++ generate('~', 1 - sizeOf $.Local.AutoCreditCodeFlag),
+BILL-TO-NAME:$.Name  ++ generate(' ', 25 - sizeOf $.Name) when ((sizeOf $.Name) > 0 ) otherwise  $.Name ++ generate('~', 25)  ,
+AUTO-CR-DEPT:$.Local.AutoCreditDepartment ++ generate(' ', 2 - sizeOf $.Local.AutoCreditDepartment)  when ((sizeOf $.Local.AutoCreditDepartment ) > 0 ) otherwise  $.Local.AutoCreditDepartment  ++ generate('~', 2 - sizeOf $.Local.AutoCreditDepartment),
+BILL-TO-ADDR-1:flowVars.BILL-TO-ADDR-1,
+BILL-TO-ADDR-2:flowVars.BILL-TO-ADDR-2,
+BILL-TO-ADDR-3:flowVars.BILL-TO-ADDR-3,
+BILL-TO-CITY:flowVars.BILL-TO-CITY,
+BILL-TO-STATE:flowVars.BILL-TO-STATE,
+BILL-TO-ZIP:flowVars.BILL-TO-ZIP,
+CUST-TYPE-CODE:$.Local.CustomerTypeCode ++ generate(' ', 2 - sizeOf $.Local.CustomerTypeCode) when ((sizeOf $.Local.CustomerTypeCode ) > 0 ) otherwise  $.Local.CustomerTypeCode  ++ generate('~', 2 - sizeOf $.Local.CustomerTypeCode) ,
+BILL-TO-CONTACT:flowVars.BILL-TO-CONTACT,
+BILL-TO-TITLE:flowVars.BILL-TO-TITLE,
+NATIONAL-ACCOUNT:$.AccountType.AccountNumber ++ generate('~', 4 - sizeOf $.AccountType.AccountNumber),
+BILL-TO-PHONE:flowVars.BILL-TO-PHONE,
+SERVICE-BRANCH:$.AccountType.Region ++ generate(' ', 2 - sizeOf $.AccountType.Region) when ((sizeOf $.AccountType.Region) > 0 ) otherwise  $.AccountType.Region  ++ generate('~', 2 - sizeOf $.AccountType.Region) ,
+SHIP-TO-NAME:flowVars.SHIP-TO-NAME,
+SHIP-TO-MAIL-NAME:flowVars.SHIP-TO-MAIL-NAME,
+SHIP-TO-ADDR-1:flowVars.SHIP-TO-ADDR-1,
+SHIP-TO-MAIL-ADDR-1:flowVars.SHIP-TO-MAIL-ADDR-1,
+SHIP-TO-ADDR-2:flowVars.SHIP-TO-ADDR-2,
+SHIP-TO-MAIL-ADDR-2:flowVars.SHIP-TO-MAIL-ADDR-2,
+SHIP-TO-ADDR-3:flowVars.SHIP-TO-ADDR-3,
+SHIP-TO-MAIL-ADDR-3:flowVars.SHIP-TO-MAIL-ADDR-3,
+SHIP-TO-CITY:flowVars.SHIP-TO-CITY,
+SHIP-TO-STATE:flowVars.SHIP-TO-STATE,
+SHIP-TO-ZIP:flowVars.SHIP-TO-ZIP,
+SHIP-TO-MAIL-CITY:flowVars.SHIP-TO-MAIL-CITY,
+SHIP-TO-MAIL-STATE:flowVars.SHIP-TO-MAIL-STATE,
+SHIP-TO-MAIL-ZIP:flowVars.SHIP-TO-MAIL-ZIP,
+CUST-PHONE-NO:flowVars.CUST-PHONE-NO ,
+SHIP-TO-FAX-NUM:flowVars.SHIP-TO-FAX-NUM,
+SHIP-TO-CNTY-CODE:flowVars.SHIP-TO-CNTY-CODE,
+SHIP-TO-ALIAS-1:$.Local.ShipToAlias-1 ++ generate(' ', 11 - sizeOf $.Local.ShipToAlias-1) when ((sizeOf $.Local.ShipToAlias-1) > 0 ) otherwise  $.Local.ShipToAlias-1  ++ generate('~', 11 - sizeOf $.Local.ShipToAlias-1) ,
+SHIP-TO-ALIAS-2:$.Local.ShipToAlias-2 ++ generate(' ', 11 - sizeOf $.Local.ShipToAlias-2) when ((sizeOf $.Local.ShipToAlias-1) > 0 ) otherwise  $.Local.ShipToAlias-2  ++ generate('~', 11 - sizeOf $.Local.ShipToAlias-2) ,
+FED-EPA-NUMBER:flowVars.FED-EPA-NUMBER,
+STATE-ID-1:flowVars.STATE-ID-1,
+STATE-EPA-NUMBER:flowVars.STATE-EPA-NUMBER,
+STATE-ID-2:flowVars.STATE-ID-2,
+STATE-EPA-NUMBER-2:flowVars.STATE-EPA-NUMBER-2 ,
+CUST-SHIP-VIA-CODE:$.Local.ShipVia ++ generate(' ', 4 - sizeOf $.Local.ShipVia) when ((sizeOf $.Local.ShipVia) > 0 ) otherwise  $.Local.ShipVia  ++ generate('~', 4 - sizeOf $.Local.ShipVia) ,
+CUST-SHIP-TERMS-CODE:$.Local.ShipTerms ++ generate(' ', 2 - sizeOf $.Local.ShipTerms) when ((sizeOf $.Local.ShipTerms) > 0 ) otherwise  $.Local.ShipTerms  ++ generate('~', 2 - sizeOf $.Local.ShipTerms) ,
+SHIP-TO-DEPT-01:$.Local.ShipToDepartment ++ generate(' ', 2 - sizeOf $.Local.ShipToDepartment) when ((sizeOf $.Local.ShipToDepartment) > 0 ) otherwise  $.Local.ShipToDepartment  ++ generate('~', 2 - sizeOf $.Local.ShipToDepartment) ,
+CUST-SLSMN1-CODE:flowVars.CUST-SLSMN1-CODE,
+PCS-LICENSE-NUMBER:$.Local.PCSLicenseNumber ++ generate(' ', 15 - sizeOf $.Local.PCSLicenseNumber) when ((sizeOf $.Local.PCSLicenseNumber) > 0 ) otherwise  $.Local.PCSLicenseNumber ++ generate('~', 15 - sizeOf $.Local.PCSLicenseNumber) ,
+PCS-EXPIRE-DATE:$.Local.PCSExpiryDate ++ generate('~', 8 - sizeOf $.Local.PCSExpiryDate) ,
+PCS-LIC-NAME:$.Local.PCSLicenseName ++ generate(' ', 25 - sizeOf $.Local.PCSLicenseName) when ((sizeOf $.Local.PCSLicenseName) > 0 ) otherwise  $.Local.PCSLicenseName  ++ generate('~', 25 - sizeOf $.Local.PCSLicenseName) ,
+STWRD-EXP-DATE:$.Local.STWRDExpiryDate ++ generate('~', 8 - sizeOf $.Local.STWRDExpiryDate) ,
+CUST-TAX-EXEPT-CERT-NO:$.TaxInformation.TaxCertificateNumber ++ generate(' ', 20 - sizeOf $.TaxInformation.TaxCertificateNumber) when ((sizeOf $.TaxInformation.TaxCertificateNumber) > 0 ) otherwise  $.TaxInformation.TaxCertificateNumber  ++ generate('~', 20 - sizeOf $.TaxInformation.TaxCertificateNumber) ,
+TAX-EXEPT-EXPR-DT:$.TaxInformation.ExpiryDate ++ generate(' ', 8 - sizeOf $.TaxInformation.ExpiryDate) when ((sizeOf $.TaxInformation.ExpiryDate) > 0 ) otherwise  $.TaxInformation.ExpiryDate  ++ generate('~', 8 - sizeOf $.TaxInformation.ExpiryDate) ,
+COMB-TABLE-CODE:$.Local.CombTableCode ++ generate(' ', 4 - sizeOf $.Local.CombTableCode) when ((sizeOf $.Local.CombTableCode) > 0 ) otherwise  $.Local.CombTableCode  ++ generate('~', 4 - sizeOf $.Local.CombTableCode) ,
+SHIP-TO-CONTAINER-DE:$.Local.ShipToContainer ++ generate(' ', 1 - sizeOf $.Local.ShipToContainer) when ((sizeOf $.Local.ShipToContainer) > 0 ) otherwise  $.Local.ShipToContainer  ++ generate('~', 1 - sizeOf $.Local.ShipToContainer) ,
+PRINT-PRICE-FLAG:$.Local.PrintPriceFlag  ++ generate(' ', 1 - sizeOf $.Local.PrintPriceFlag ) when ((sizeOf $.Local.PrintPriceFlag ) > 0 ) otherwise  $.Local.PrintPriceFlag   ++ generate('~', 1 - sizeOf $.Local.PrintPriceFlag) ,
+PRIME-DELIV-METHOD:$.Local.PrimaryDeliveryMethod ++ generate(' ', 2 - sizeOf $.Local.PrimaryDeliveryMethod) when ((sizeOf $.Local.PrimaryDeliveryMethod) > 0 ) otherwise  $.Local.PrimaryDeliveryMethod  ++ generate('~', 2 - sizeOf $.Local.PrimaryDeliveryMethod) ,
+CUST-ORDR-FILL-CODE:$.Local.ShipmentIndicatorCode  ++ generate(' ', 1 - sizeOf $.Local.ShipmentIndicatorCode ) when ((sizeOf $.Local.ShipmentIndicatorCode) > 0 ) otherwise  $.Local.ShipmentIndicatorCode  ++ generate('~', 1 - sizeOf $.Local.ShipmentIndicatorCode) ,
+MAIL-INV-FLAG:$.Local.MailInvoiceFlag ++ generate(' ', 1 - sizeOf $.Local.MailInvoiceFlag) when ((sizeOf $.Local.MailInvoiceFlag) > 0 ) otherwise  $.Local.MailInvoiceFlag  ++ generate('~', 1 - sizeOf $.Local.MailInvoiceFlag) ,
+CUST-CLASS-CODE:$.Local.CustomerClassCode ++ generate(' ', 3 - sizeOf $.Local.CustomerClassCode) when ((sizeOf $.Local.CustomerClassCode) > 0 ) otherwise  $.Local.CustomerClassCode  ++ generate('~', 3 - sizeOf $.Local.CustomerClassCode) ,
+SINGLE-LOT-FLAG:$.Local.SingleLotFlag ++ generate(' ', 1 - sizeOf $.Local.SingleLotFlag) when ((sizeOf $.Local.SingleLotFlag) > 0 ) otherwise  $.Local.SingleLotFlag  ++ generate('~', 1 - sizeOf $.Local.SingleLotFlag) ,
+EXPORTER-FLAG:$.Local.ExporterFlag ++ generate(' ', 1 - sizeOf $.Local.ExporterFlag) when ((sizeOf $.Local.ExporterFlag) > 0 ) otherwise  $.Local.ExporterFlag  ++ generate('~', 1 - sizeOf $.Local.ExporterFlag) ,
+SHIP-TO-SALUTATION:flowVars.SHIP-TO-SALUTATION,
+SHIP-TO-SALES-CONTACT:flowVars.SHIP-TO-SALES-CONTACT,
+SALES-CONTACT-PHONE:flowVars.SALES-CONTACT-PHONE,
+SHIP-TO-BUS-CONTACT:flowVars.SHIP-TO-BUS-CONTACT,
+BUS-CONTACT-PHONE:flowVars.BUS-CONTACT-PHONE,
+SHIP-TO-DELIV-CONTACT:flowVars.SHIP-TO-DELIV-CONTACT,
+DELIV-CONTACT-PHONE:flowVars.DELIV-CONTACT-PHONE,
+SHIP-TO-TECH-CONTACT:flowVars.SHIP-TO-TECH-CONTACT,
+SHIP-TO-TECH-CONTACT-PHON:flowVars.SHIP-TO-TECH-CONTACT-PHON 
+}
+)
+}]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="BILL-TO-SHORT-NAME" value="#[flowVars['BILL-TO-SHORT-NAME'].substring(0,10)]"/>
+            
+            <add-message-property key="BILL-TO-ADDR-1" value="#[flowVars['BILL-TO-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-ADDR-2" value="#[flowVars['BILL-TO-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-ADDR-3" value="#[flowVars['BILL-TO-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-CITY" value="#[flowVars['BILL-TO-CITY'].substring(0,12)]"/>
+            <add-message-property key="BILL-TO-STATE" value="#[flowVars['BILL-TO-STATE'].substring(0,2)]"/>
+            <add-message-property key="BILL-TO-ZIP" value="#[flowVars['BILL-TO-ZIP'].substring(0,9)]"/>
+            <add-message-property key="BILL-TO-CONTACT" value="#[flowVars['BILL-TO-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="BILL-TO-TITLE" value="#[flowVars['BILL-TO-TITLE'].substring(0,20)]"/>
+            <add-message-property key="BILL-TO-PHONE" value="#[flowVars['BILL-TO-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-NAME" value="#[flowVars['SHIP-TO-NAME'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-1" value="#[flowVars['SHIP-TO-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-2" value="#[flowVars['SHIP-TO-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-ADDR-3" value="#[flowVars['SHIP-TO-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-CITY" value="#[flowVars['SHIP-TO-CITY'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-STATE" value="#[flowVars['SHIP-TO-STATE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-ZIP" value="#[flowVars['SHIP-TO-ZIP'].substring(0,9)]"/>
+            <add-message-property key="SHIP-TO-FAX-NUM" value="#[flowVars['SHIP-TO-FAX-NUM'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-CNTY-CODE" value="#[flowVars['SHIP-TO-CNTY-CODE'].substring(0,3)]"/>
+            <add-message-property key="SHIP-TO-SALUTATION" value="#[flowVars['SHIP-TO-SALUTATION'].substring(0,15)]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[flowVars['CUST-SHIP-TO-SUFFIX'].substring(0,3)]"/>
+            <add-message-property key="SHIP-TO-MAIL-NAME" value="#[flowVars['SHIP-TO-MAIL-NAME'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-1" value="#[flowVars['SHIP-TO-MAIL-ADDR-1'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-2" value="#[flowVars['SHIP-TO-MAIL-ADDR-2'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ADDR-3" value="#[flowVars['SHIP-TO-MAIL-ADDR-3'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-MAIL-CITY" value="#[flowVars['SHIP-TO-MAIL-CITY'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-MAIL-STATE" value="#[flowVars['SHIP-TO-MAIL-STATE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-MAIL-ZIP" value="#[flowVars['SHIP-TO-MAIL-ZIP'].substring(0,9)]"/>
+            <add-message-property key="SHIP-TO-SALES-CONTACT" value="#[flowVars['SHIP-TO-SALES-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="SALES-CONTACT-PHONE" value="#[flowVars['SALES-CONTACT-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-BUS-CONTACT" value="#[flowVars['SHIP-TO-BUS-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="BUS-CONTACT-PHONE" value="#[flowVars['BUS-CONTACT-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-DELIV-CONTACT" value="#[flowVars['SHIP-TO-DELIV-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="DELIV-CONTACT-PHONE" value="#[flowVars['DELIV-CONTACT-PHONE'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT" value="#[flowVars['SHIP-TO-TECH-CONTACT'].substring(0,25)]"/>
+            <add-message-property key="SHIP-TO-TECH-CONTACT-PHON" value="#[flowVars['SHIP-TO-TECH-CONTACT-PHON'].substring(0,12)]"/>
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            
+            <add-message-property key="UNIQUE-ID" value="#[xpath3('//Trim/UNIQUE-ID')]"/>
+            <add-message-property key="SALES-OFFICE" value="#[xpath3('//Trim/SALES-OFFICE')]"/>
+            <add-message-property key="WAREHOUSE" value="#[xpath3('//Trim/WAREHOUSE')]"/>
+            <add-message-property key="CUST-NUMBER" value="#[xpath3('//Trim/CUST-NUMBER')]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[xpath3('//Trim/CUST-SHIP-TO-SUFFIX')]"/>
+            <add-message-property key="AUTO-CR-COD-FLAG" value="#[xpath3('//Trim/AUTO-CR-COD-FLAG')]"/>
+            <add-message-property key="AUTO-CR-DEPT" value="#[xpath3('//Trim/AUTO-CR-DEPT')]"/>
+            <add-message-property key="CUST-TYPE-CODE" value="#[xpath3('//Trim/CUST-TYPE-CODE')]"/>
+            <add-message-property key="NATIONAL-ACCOUNT" value="#[xpath3('//Trim/NATIONAL-ACCOUNT')]"/>
+            <add-message-property key="SERVICE-BRANCH" value="#[xpath3('//Trim/SERVICE-BRANCH')]"/>
+            
+            <add-message-property key="SHIP-TO-ALIAS-1" value="#[xpath3('//Trim/SHIP-TO-ALIAS-1')]"/>
+            <add-message-property key="SHIP-TO-ALIAS-2" value="#[xpath3('//Trim/SHIP-TO-ALIAS-2')]"/>
+            <add-message-property key="CUST-SHIP-VIA-CODE" value="#[xpath3('//Trim/CUST-SHIP-VIA-CODE')]"/>
+            <add-message-property key="CUST-SHIP-TERMS-CODE" value="#[xpath3('//Trim/CUST-SHIP-TERMS-CODE')]"/>
+            <add-message-property key="SHIP-TO-DEPT-01" value="#[xpath3('//Trim/SHIP-TO-DEPT-01')]"/>
+            <add-message-property key="PCS-LICENSE-NUMBER" value="#[xpath3('//Trim/PCS-LICENSE-NUMBER')]"/>
+            <add-message-property key="PCS-EXPIRE-DATE" value="#[xpath3('//Trim/PCS-EXPIRE-DATE')]"/>
+            <add-message-property key="PCS-LIC-NAME" value="#[xpath3('//Trim/PCS-LIC-NAME')]"/>
+            <add-message-property key="STWRD-EXP-DATE" value="#[xpath3('//Trim/STWRD-EXP-DATE')]"/>
+            <add-message-property key="CUST-TAX-EXEPT-CERT-NO" value="#[xpath3('//Trim/CUST-TAX-EXEPT-CERT-NO')]"/>
+            <add-message-property key="TAX-EXEPT-EXPR-DT" value="#[xpath3('//Trim/TAX-EXEPT-EXPR-DT')]"/>
+            <add-message-property key="COMB-TABLE-CODE" value="#[xpath3('//Trim/COMB-TABLE-CODE')]"/>
+            <add-message-property key="SHIP-TO-CONTAINER-DE" value="#[xpath3('//Trim/SHIP-TO-CONTAINER-DE')]"/>
+            <add-message-property key="PRINT-PRICE-FLAG" value="#[xpath3('//Trim/PRINT-PRICE-FLAG')]"/>
+            <add-message-property key="PRIME-DELIV-METHOD" value="#[xpath3('//Trim/PRIME-DELIV-METHOD')]"/>
+            <add-message-property key="CUST-ORDR-FILL-CODE" value="#[xpath3('//Trim/CUST-ORDR-FILL-CODE')]"/>
+            <add-message-property key="MAIL-INV-FLAG" value="#[xpath3('//Trim/MAIL-INV-FLAG')]"/>
+            <add-message-property key="CUST-CLASS-CODE" value="#[xpath3('//Trim/CUST-CLASS-CODE')]"/>
+            <add-message-property key="SINGLE-LOT-FLAG" value="#[xpath3('//Trim/SINGLE-LOT-FLAG')]"/>
+            <add-message-property key="EXPORTER-FLAG" value="#[xpath3('//Trim/EXPORTER-FLAG')]"/>
+        </message-properties-transformer>
+        <message-properties-transformer scope="invocation" doc:name="Message Properties">
+            <add-message-property key="UNIQUE-ID" value="#[flowVars['UNIQUE-ID'].substring(0,18)]"/>
+            <add-message-property key="SALES-OFFICE" value="#[flowVars['SALES-OFFICE'].substring(0,2)]"/>
+            <add-message-property key="WAREHOUSE" value="#[flowVars['WAREHOUSE'].substring(0,2)]"/>
+            <add-message-property key="CUST-NUMBER" value="#[flowVars['CUST-NUMBER'].substring(0,6)]"/>
+            <add-message-property key="CUST-SHIP-TO-SUFFIX" value="#[flowVars['CUST-SHIP-TO-SUFFIX'].substring(0,3)]"/>
+            <add-message-property key="AUTO-CR-COD-FLAG" value="#[flowVars['AUTO-CR-COD-FLAG'].substring(0,1)]"/>
+            <add-message-property key="AUTO-CR-DEPT" value="#[flowVars['AUTO-CR-DEPT'].substring(0,2)]"/>
+            <add-message-property key="CUST-TYPE-CODE" value="#[flowVars['CUST-TYPE-CODE'].substring(0,2)]"/>
+            <add-message-property key="NATIONAL-ACCOUNT" value="#[flowVars['NATIONAL-ACCOUNT'].substring(0,4)]"/>
+            <add-message-property key="SERVICE-BRANCH" value="#[flowVars['SERVICE-BRANCH'].substring(0,2)]"/>
+            <add-message-property key="CUST-PHONE-NO" value="#[flowVars['CUST-PHONE-NO'].substring(0,12)]"/>
+            <add-message-property key="SHIP-TO-ALIAS-1" value="#[flowVars['SHIP-TO-ALIAS-1'].substring(0,11)]"/>
+            <add-message-property key="SHIP-TO-ALIAS-2" value="#[flowVars['SHIP-TO-ALIAS-2'].substring(0,11)]"/>
+            <add-message-property key="CUST-SHIP-VIA-CODE" value="#[flowVars['CUST-SHIP-VIA-CODE'].substring(0,4)]"/>
+            <add-message-property key="CUST-SHIP-TERMS-CODE" value="#[flowVars['CUST-SHIP-TERMS-CODE'].substring(0,2)]"/>
+            <add-message-property key="SHIP-TO-DEPT-01" value="#[flowVars['SHIP-TO-DEPT-01'].substring(0,2)]"/>
+            <add-message-property key="PCS-LICENSE-NUMBER" value="#[flowVars['PCS-LICENSE-NUMBER'].substring(0,15)]"/>
+            <add-message-property key="PCS-EXPIRE-DATE" value="#[flowVars['PCS-EXPIRE-DATE'].substring(0,8)]"/>
+            <add-message-property key="PCS-LIC-NAME" value="#[flowVars['PCS-LIC-NAME'].substring(0,25)]"/>
+            <add-message-property key="STWRD-EXP-DATE" value="#[flowVars['STWRD-EXP-DATE'].substring(0,8)]"/>
+            <add-message-property key="CUST-TAX-EXEPT-CERT-NO" value="#[flowVars['CUST-TAX-EXEPT-CERT-NO'].substring(0,20)]"/>
+            <add-message-property key="TAX-EXEPT-EXPR-DT" value="#[flowVars['TAX-EXEPT-EXPR-DT'].substring(0,8)]"/>
+            <add-message-property key="COMB-TABLE-CODE" value="#[flowVars['COMB-TABLE-CODE'].substring(0,4)]"/>
+            <add-message-property key="SHIP-TO-CONTAINER-DE" value="#[flowVars['SHIP-TO-CONTAINER-DE'].substring(0,1)]"/>
+            <add-message-property key="PRINT-PRICE-FLAG" value="#[flowVars['PRINT-PRICE-FLAG'].substring(0,1)]"/>
+            <add-message-property key="PRIME-DELIV-METHOD" value="#[flowVars['PRIME-DELIV-METHOD'].substring(0,2)]"/>
+            <add-message-property key="CUST-ORDR-FILL-CODE" value="#[flowVars['CUST-ORDR-FILL-CODE'].substring(0,1)]"/>
+            <add-message-property key="MAIL-INV-FLAG" value="#[flowVars['MAIL-INV-FLAG'].substring(0,1)]"/>
+            <add-message-property key="CUST-CLASS-CODE" value="#[flowVars['CUST-CLASS-CODE'].substring(0,3)]"/>
+            <add-message-property key="SINGLE-LOT-FLAG" value="#[flowVars['SINGLE-LOT-FLAG'].substring(0,1)]"/>
+            <add-message-property key="EXPORTER-FLAG" value="#[flowVars['EXPORTER-FLAG'].substring(0,1)]"/>
+            <add-message-property key="FED-EPA-NUMBER" value="#[flowVars['FED-EPA-NUMBER'].substring(0,12)]"/>
+            <add-message-property key="STATE-EPA-NUMBER" value="#[flowVars['STATE-EPA-NUMBER'].substring(0,12)]"/>
+            <add-message-property key="STATE-EPA-NUMBER-2" value="#[flowVars['STATE-EPA-NUMBER-2'].substring(0,12)]"/>
+            <add-message-property key="STATE-ID-1" value="#[flowVars['STATE-ID-1'].substring(0,2)]"/>
+            <add-message-property key="STATE-ID-2" value="#[flowVars['STATE-ID-2'].substring(0,2)]"/>
+        </message-properties-transformer>
+        <dw:transform-message doc:name="Transform Message">
+            <dw:set-payload><![CDATA[%dw 1.0
+%output application/csv header=false, separator="|", escape="<"
+%function generate(char, times) (char ++ generate(char, times - 1)) when times > 0 otherwise ""
+---
+payload map {
+UNIQUE-ID:flowVars.UNIQUE-ID,
+USERID:flowVars.DCSId,
+SALES-OFFICE:flowVars.SALES-OFFICE,
+WAREHOUSE:flowVars.WAREHOUSE,
+CUST-NUMBER:flowVars.CUST-NUMBER,
+CUST-SHIP-TO-SUFFIX:flowVars.CUST-SHIP-TO-SUFFIX,
+BILL-TO-SHORT-NAME:generate('~',10),
+AUTO-CR-COD-FLAG: generate('~', 1) ,
+BILL-TO-NAME:generate('~',25),
+AUTO-CR-DEPT:generate('~', 2) ,
+BILL-TO-ADDR-1:generate('~',25),
+BILL-TO-ADDR-2:generate('~',25),
+BILL-TO-ADDR-3:generate('~',25),
+BILL-TO-CITY:generate('~',12),
+BILL-TO-STATE:generate('~',2),
+BILL-TO-ZIP:generate('~',9),
+CUST-TYPE-CODE:generate('~',2),
+BILL-TO-CONTACT:generate('~',25),
+BILL-TO-TITLE:generate('~',20),
+NATIONAL-ACCOUNT:generate('~',4),
+BILL-TO-PHONE:generate('~',12),
+SERVICE-BRANCH:flowVars.SERVICE-BRANCH,
+SHIP-TO-NAME:flowVars.SHIP-TO-NAME,
+SHIP-TO-MAIL-NAME:flowVars.SHIP-TO-MAIL-NAME,
+SHIP-TO-ADDR-1:flowVars.SHIP-TO-ADDR-1,
+SHIP-TO-MAIL-ADDR-1:flowVars.SHIP-TO-MAIL-ADDR-1,
+SHIP-TO-ADDR-2:flowVars.SHIP-TO-ADDR-2,
+SHIP-TO-MAIL-ADDR-2:flowVars.SHIP-TO-MAIL-ADDR-2,
+SHIP-TO-ADDR-3:flowVars.SHIP-TO-ADDR-3,
+SHIP-TO-MAIL-ADDR-3:flowVars.SHIP-TO-MAIL-ADDR-3,
+SHIP-TO-CITY:flowVars.SHIP-TO-CITY,
+SHIP-TO-STATE:generate('~',2),
+SHIP-TO-ZIP:flowVars.SHIP-TO-ZIP,
+SHIP-TO-MAIL-CITY:flowVars.SHIP-TO-MAIL-CITY,
+SHIP-TO-MAIL-STATE:flowVars.SHIP-TO-MAIL-STATE,
+SHIP-TO-MAIL-ZIP:flowVars.SHIP-TO-MAIL-ZIP,
+CUST-PHONE-NO:flowVars.CUST-PHONE-NO,
+SHIP-TO-FAX-NUM:flowVars.SHIP-TO-FAX-NUM,
+SHIP-TO-CNTY-CODE:flowVars.SHIP-TO-CNTY-CODE,
+SHIP-TO-ALIAS-1:flowVars.SHIP-TO-ALIAS-1,
+SHIP-TO-ALIAS-2:flowVars.SHIP-TO-ALIAS-2,
+FED-EPA-NUMBER:flowVars.FED-EPA-NUMBER,
+STATE-ID-1:flowVars.STATE-ID-1,
+STATE-EPA-NUMBER:flowVars.STATE-EPA-NUMBER,
+STATE-ID-2:flowVars.STATE-ID-2,
+STATE-EPA-NUMBER-2:( flowVars.STATE-EPA-NUMBER-2  ++ generate(' ', 3) unless (flowVars.STATE-EPA-NUMBER-2 == "~~~~~~~~~~~~") otherwise  generate('~',3) )  ,
+CUST-SHIP-VIA-CODE:flowVars.CUST-SHIP-VIA-CODE,
+CUST-SHIP-TERMS-CODE:flowVars.CUST-SHIP-TERMS-CODE,
+SHIP-TO-DEPT-01:generate('~',2),
+CUST-SLSMN1-CODE:generate('~',3),
+PCS-LICENSE-NUMBER:flowVars.PCS-LICENSE-NUMBER,
+PCS-EXPIRE-DATE:flowVars.PCS-EXPIRE-DATE,
+PCS-LIC-NAME:flowVars.PCS-LIC-NAME,
+STWRD-EXP-DATE:flowVars.STWRD-EXP-DATE,
+CUST-TAX-EXEPT-CERT-NO:flowVars.CUST-TAX-EXEPT-CERT-NO,
+TAX-EXEPT-EXPR-DT:flowVars.TAX-EXEPT-EXPR-DT,
+COMB-TABLE-CODE:flowVars.COMB-TABLE-CODE,
+SHIP-TO-CONTAINER-DE:flowVars.SHIP-TO-CONTAINER-DE,
+PRINT-PRICE-FLAG:flowVars.PRINT-PRICE-FLAG,
+PRIME-DELIV-METHOD:flowVars.PRIME-DELIV-METHOD,
+CUST-ORDR-FILL-CODE:flowVars.CUST-ORDR-FILL-CODE,
+MAIL-INV-FLAG:flowVars.MAIL-INV-FLAG,
+CUST-CLASS-CODE:flowVars.CUST-CLASS-CODE,
+SINGLE-LOT-FLAG:flowVars.SINGLE-LOT-FLAG,
+EXPORTER-FLAG:flowVars.EXPORTER-FLAG,
+SHIP-TO-SALUTATION:flowVars.SHIP-TO-SALUTATION,
+SHIP-TO-SALES-CONTACT:flowVars.SHIP-TO-SALES-CONTACT,
+SALES-CONTACT-PHONE:flowVars.SALES-CONTACT-PHONE,
+SHIP-TO-BUS-CONTACT:flowVars.SHIP-TO-BUS-CONTACT,
+BUS-CONTACT-PHONE:flowVars.BUS-CONTACT-PHONE,
+SHIP-TO-DELIV-CONTACT:flowVars.SHIP-TO-DELIV-CONTACT,
+DELIV-CONTACT-PHONE:flowVars.DELIV-CONTACT-PHONE,
+SHIP-TO-TECH-CONTACT:flowVars.SHIP-TO-TECH-CONTACT,
+SHIP-TO-TECH-CONTACT-PHON:flowVars.SHIP-TO-TECH-CONTACT-PHON 
+}
+]]></dw:set-payload>
+        </dw:transform-message>
+        <object-to-string-transformer doc:name="Object to String"/>
+        <set-payload value="#[payload.replaceAll(&quot;&lt;&quot;, &quot;&quot;).replaceAll(&quot;\r&quot;, &quot;&quot;).replaceAll(&quot;\n&quot;, &quot;&quot;).toString()]" mimeType="application/csv" doc:name="Set Payload"/>
+    </sub-flow>
+
+</mule>

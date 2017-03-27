@@ -1,0 +1,17 @@
+<?xml version="1.0" encoding="UTF-8"?>
+
+<mule xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq" xmlns:tracking="http://www.mulesoft.org/schema/mule/ee/tracking" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation"
+	xmlns:spring="http://www.springframework.org/schema/beans" 
+	xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+	xsi:schemaLocation="http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/mule/ee/tracking/current/mule-tracking-ee.xsd
+http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd">
+    <flow name="UpdateCustProdCode">
+        <byte-array-to-string-transformer doc:name="Byte Array to String"/>
+        <logger message="Incoming Payload : #[payload]" level="INFO" doc:name="Incoming Payload"/>
+        <wmq:outbound-endpoint queue="${wmq.custprodcode.queue}" connector-ref="WMQNonXA" doc:name="WMQ"/>
+        <set-payload value="&lt;Response&gt;&lt;Status&gt;SUCCESS&lt;/Status&gt;&lt;/Response&gt;" encoding="US-ASCII" mimeType="application/xml" doc:name="Set Payload"/>
+        <logger message="Status : #[payload]" level="INFO" doc:name="Logger"/>
+    </flow>
+</mule>

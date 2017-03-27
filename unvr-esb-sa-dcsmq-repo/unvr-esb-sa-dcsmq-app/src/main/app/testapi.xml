@@ -1,0 +1,130 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<mule xmlns:jms="http://www.mulesoft.org/schema/mule/jms" xmlns:dw="http://www.mulesoft.org/schema/mule/ee/dw" xmlns="http://www.mulesoft.org/schema/mule/core" xmlns:apikit="http://www.mulesoft.org/schema/mule/apikit" xmlns:doc="http://www.mulesoft.org/schema/mule/documentation" xmlns:http="http://www.mulesoft.org/schema/mule/http" xmlns:mulexml="http://www.mulesoft.org/schema/mule/xml" xmlns:secure-property-placeholder="http://www.mulesoft.org/schema/mule/secure-property-placeholder" xmlns:sfdc="http://www.mulesoft.org/schema/mule/sfdc" xmlns:spring="http://www.springframework.org/schema/beans" xmlns:tls="http://www.mulesoft.org/schema/mule/tls" xmlns:vm="http://www.mulesoft.org/schema/mule/vm" xmlns:wmq="http://www.mulesoft.org/schema/mule/ee/wmq" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" xsi:schemaLocation="
+http://www.mulesoft.org/schema/mule/jms http://www.mulesoft.org/schema/mule/jms/current/mule-jms.xsd http://www.mulesoft.org/schema/mule/tls http://www.mulesoft.org/schema/mule/tls/current/mule-tls.xsd
+http://www.mulesoft.org/schema/mule/secure-property-placeholder http://www.mulesoft.org/schema/mule/secure-property-placeholder/current/mule-secure-property-placeholder.xsd
+http://www.mulesoft.org/schema/mule/ee/wmq http://www.mulesoft.org/schema/mule/ee/wmq/current/mule-wmq-ee.xsd
+http://www.mulesoft.org/schema/mule/sfdc http://www.mulesoft.org/schema/mule/sfdc/current/mule-sfdc.xsd
+http://www.mulesoft.org/schema/mule/http http://www.mulesoft.org/schema/mule/http/current/mule-http.xsd
+http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
+http://www.mulesoft.org/schema/mule/apikit http://www.mulesoft.org/schema/mule/apikit/current/mule-apikit.xsd
+http://www.mulesoft.org/schema/mule/vm http://www.mulesoft.org/schema/mule/vm/current/mule-vm.xsd
+http://www.springframework.org/schema/beans http://www.springframework.org/schema/beans/spring-beans-current.xsd
+http://www.mulesoft.org/schema/mule/core http://www.mulesoft.org/schema/mule/core/current/mule.xsd
+http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
+    <secure-property-placeholder:config name="Secure_Property_Placeholder" encryptionAlgorithm="Blowfish" key="${vault.key}" location="${environment}.properties,common.properties" ignoreResourceNotFound="true" doc:name="Secure Property Placeholder" />
+    <mulexml:namespace-manager>
+        <mulexml:namespace prefix="ns1" uri="http://com.univar/data/enterprise/business/custom/customer/accountType/1.0" />
+        <mulexml:namespace prefix="ns2" uri="http://com.univar/data/enterprise/business/custom/customer/EPAinformation/1.0" />
+        <mulexml:namespace prefix="ns3" uri="http://com.univar/data/enterprise/core/location/1.0" />
+        <mulexml:namespace prefix="ns4" uri="http://com.univar/data/enterprise/core/contact/1.0" />
+        <mulexml:namespace prefix="ns5" uri="http://com.univar/data/enterprise/core/address/1.0" />
+        <mulexml:namespace prefix="ns6" uri="http://com.univar/data/local/dcs/customer/local/1.0" />
+        <mulexml:namespace prefix="ns7" uri="http://com.univar/data/enterprise/business/custom/customer/TAXinformation/1.0" />
+        <mulexml:namespace prefix="ns8" uri="http://com.univar/data/enterprise/core/employee/1.0" />
+    </mulexml:namespace-manager>
+    	<http:listener-config name="app-httpListenerConfig"  host="${http.host}" port="${http.secure.port}" doc:name="httpListenerConfig" protocol="HTTPS">
+        <tls:context>
+            <tls:key-store type="jks" path="keystore-app-${environment}.jks" alias="app-mule-worker-internal" keyPassword="${ssl.jks.keypass}" password="${ssl.jks.storepass}"/>
+        </tls:context>
+
+    </http:listener-config>
+    
+    <spring:beans>
+        <spring:bean id="mqConnectionFactoryNonXA" name="mqConnectionFactoryNonXA" class="com.ibm.mq.jms.MQQueueConnectionFactory">
+            <spring:property name="transportType" value="1"/>
+            <spring:property name="queueManager" value="${wmq.queueManger}"/>
+            <spring:property name="hostName" value="${wmq.serverAddress}"/>
+            <spring:property name="port" value="${wmq.serverPort}"/>
+            <spring:property name="channel" value="${wmq.channel}"/>
+        </spring:bean>
+    </spring:beans>
+     
+    <jms:caching-connection-factory name="mqCachingConnectionFactoryNonXA" 
+        connectionFactory-ref="mqConnectionFactoryNonXA" 
+        sessionCacheSize="2" 
+        username="${wmq.user}" 
+        password="${wmq.password}"/>
+     
+    <!-- set numberOfConsumers to 3 because there are 2 queues (EI.G4.SALESORDER and EI.G4.CUSTPRODCODE) using this WMQNonXA connector 
+         numberOfConsumers = no of end points +1 -->  
+    <wmq:connector name="WMQNonXA" validateConnections="true" doc:name="WMQNonXA" 
+                   connectionFactory-ref="mqCachingConnectionFactoryNonXA" 
+                   numberOfConsumers="3" 
+                   transportType="CLIENT_MQ_TCPIP" 
+                   specification="1.1" 
+                   persistentDelivery="true">
+        <reconnect frequency="${wmq.reconnect.frequency}" count="${wmq.reconnect.count}"/>
+    </wmq:connector>
+    
+    <apikit:config name="app-api-config" raml="customer.raml" consoleEnabled="true" consolePath="console" doc:name="Router">
+        <apikit:flow-mapping resource="/order" action="post" content-type="application/xml" flow-ref="post:/order:api-config"/>
+        <apikit:flow-mapping resource="/customer/custproductcode" action="post" content-type="application/xml" flow-ref="post:/customer/custproductcode:api-config"/>
+
+    </apikit:config>
+    <sfdc:config name="Salesforce__Basic_authentication" username="${sfdc.userid}" password="${sfdc.pwd}" url="${sfdc.url}" disableSessionInvalidation="true" doc:name="Salesforce: Basic authentication">
+        <reconnect-forever />
+    </sfdc:config>
+
+    <http:listener-config name="customer-httpListenerConfig" host="0.0.0.0" port="8081" doc:name="HTTP Listener Configuration"/> 
+    <apikit:config name="customer-config" raml="customer.raml" consoleEnabled="false" doc:name="Router"/>
+    <flow name="api-main">
+        <http:listener config-ref="app-httpListenerConfig" path="/api/*" doc:name="HTTP" />
+        <apikit:router config-ref="app-api-config" doc:name="APIkit Router" />
+    </flow>
+    <flow name="put:/customer/ShipTo:api-config">
+        <object-to-string-transformer doc:name="Object to String" />
+        <vm:outbound-endpoint exchange-pattern="one-way" path="ShipTo-Update" doc:name="VM" />
+        <set-payload value="&quot;Accepted&quot;" doc:name="Set Payload" />
+        <exception-strategy ref="api-ExceptionMapping" doc:name="Reference Exception Strategy" />
+    </flow>
+    <flow name="post:/customer/Customer:api-config">
+        <object-to-string-transformer doc:name="Object to String" />
+        <vm:outbound-endpoint exchange-pattern="one-way" path="Customer-Create" doc:name="VM" />
+        <set-payload value="&quot;Accepted&quot;" doc:name="Set Payload" />
+        <exception-strategy ref="api-ExceptionMapping" doc:name="Reference Exception Strategy" />
+    </flow>
+    <flow name="post:/customer/ShipTo:api-config">
+        <object-to-string-transformer doc:name="Object to String" />
+        <vm:outbound-endpoint exchange-pattern="one-way" path="ShipTo-Create" doc:name="VM" />
+        <set-payload value="&quot;Accepted&quot;" doc:name="Set Payload" />
+        <exception-strategy ref="api-ExceptionMapping" doc:name="Reference Exception Strategy" />
+    </flow>
+     <flow name="post:/customer/custproductcode:api-config">
+        <flow-ref name="UpdateCustProdCode" doc:name="UpdateCustProductCode"/>
+        
+        <exception-strategy ref="api-ExceptionMapping" doc:name="Reference Exception Strategy" />
+    </flow>
+    <apikit:mapping-exception-strategy name="api-ExceptionMapping">
+        <apikit:mapping statusCode="404">
+            <apikit:exception value="org.mule.module.apikit.exception.NotFoundException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Resource not found&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="405">
+            <apikit:exception value="org.mule.module.apikit.exception.MethodNotAllowedException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Method not allowed&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="415">
+            <apikit:exception value="org.mule.module.apikit.exception.UnsupportedMediaTypeException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Unsupported media type&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="406">
+            <apikit:exception value="org.mule.module.apikit.exception.NotAcceptableException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Not acceptable&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+        <apikit:mapping statusCode="400">
+            <apikit:exception value="org.mule.module.apikit.exception.BadRequestException" />
+            <set-property propertyName="Content-Type" value="application/json" doc:name="Property" />
+            <set-payload value="{ &quot;message&quot;: &quot;Bad request&quot; }" doc:name="Set Payload" />
+        </apikit:mapping>
+    </apikit:mapping-exception-strategy>
+
+    <flow name="post:/order:api-config">
+        <flow-ref name="order-implementationFlow" doc:name="Coupa implementation"/>
+        
+    </flow>
+
+</mule>

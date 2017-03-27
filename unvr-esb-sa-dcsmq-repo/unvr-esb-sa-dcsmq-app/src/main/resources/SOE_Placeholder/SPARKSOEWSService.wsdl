@@ -1,0 +1,73 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<definitions name="SPARKSOEWSService" targetNamespace="http://webserviceclasses/" xmlns:wsp1_2="http://schemas.xmlsoap.org/ws/2004/09/policy" xmlns="http://schemas.xmlsoap.org/wsdl/" xmlns:wsp="http://www.w3.org/ns/ws-policy" xmlns:wsam="http://www.w3.org/2007/05/addressing/metadata" xmlns:xsd="http://www.w3.org/2001/XMLSchema" xmlns:wsu="http://docs.oasis-open.org/wss/2004/01/oasis-200401-wss-wssecurity-utility-1.0.xsd" xmlns:tns="http://webserviceclasses/" xmlns:soap="http://schemas.xmlsoap.org/wsdl/soap/">
+  <types>
+    <xsd:schema>
+      <xsd:import namespace="http://webserviceclasses/" schemaLocation="SPARKSOEWSService_schema1.xsd"/>
+    </xsd:schema>
+  </types>
+  <message name="getNestedBeanNamesResponse">
+    <part name="parameters" element="tns:getNestedBeanNamesResponse">
+    </part>
+  </message>
+  <message name="Exception">
+    <part name="fault" element="tns:Exception">
+    </part>
+  </message>
+  <message name="sPARKSOEProcessWS">
+    <part name="parameters" element="tns:sPARKSOEProcessWS">
+    </part>
+  </message>
+  <message name="getNestedBeanNames">
+    <part name="parameters" element="tns:getNestedBeanNames">
+    </part>
+  </message>
+  <message name="sPARKSOEProcessWSResponse">
+    <part name="parameters" element="tns:sPARKSOEProcessWSResponse">
+    </part>
+  </message>
+  <portType name="SPARKSOEWSDelegate">
+    <operation name="sPARKSOEProcessWS">
+      <input message="tns:sPARKSOEProcessWS" wsam:Action="http://webserviceclasses/SPARKSOEWSDelegate/sPARKSOEProcessWSRequest">
+    </input>
+      <output message="tns:sPARKSOEProcessWSResponse" wsam:Action="http://webserviceclasses/SPARKSOEWSDelegate/sPARKSOEProcessWSResponse">
+    </output>
+      <fault name="Exception" message="tns:Exception" wsam:Action="http://webserviceclasses/SPARKSOEWSDelegate/sPARKSOEProcessWS/Fault/Exception">
+    </fault>
+    </operation>
+    <operation name="getNestedBeanNames">
+      <input message="tns:getNestedBeanNames" wsam:Action="http://webserviceclasses/SPARKSOEWSDelegate/getNestedBeanNamesRequest">
+    </input>
+      <output message="tns:getNestedBeanNamesResponse" wsam:Action="http://webserviceclasses/SPARKSOEWSDelegate/getNestedBeanNamesResponse">
+    </output>
+    </operation>
+  </portType>
+  <binding name="SPARKSOEWSPortBinding" type="tns:SPARKSOEWSDelegate">
+    <soap:binding style="document" transport="http://schemas.xmlsoap.org/soap/http"/>
+    <operation name="sPARKSOEProcessWS">
+      <soap:operation soapAction=""/>
+      <input>
+        <soap:body use="literal"/>
+      </input>
+      <output>
+        <soap:body use="literal"/>
+      </output>
+      <fault name="Exception">
+        <soap:fault name="Exception" use="literal"/>
+      </fault>
+    </operation>
+    <operation name="getNestedBeanNames">
+      <soap:operation soapAction=""/>
+      <input>
+        <soap:body use="literal"/>
+      </input>
+      <output>
+        <soap:body use="literal"/>
+      </output>
+    </operation>
+  </binding>
+  <service name="SPARKSOEWSService">
+    <port name="SPARKSOEWSPort" binding="tns:SPARKSOEWSPortBinding">
+      <soap:address location="http://ltv-sea-hatsws1.chemd.net:80/Spark_SOE_Sales_Order_Entry/SPARKSOEWSService"/>
+    </port>
+  </service>
+</definitions>

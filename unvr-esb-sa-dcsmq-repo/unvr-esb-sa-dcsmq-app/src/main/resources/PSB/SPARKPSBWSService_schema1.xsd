@@ -1,0 +1,111 @@
+<?xml version="1.0" encoding="UTF-8"?><xs:schema targetNamespace="http://webserviceclasses/" version="1.0" xmlns:tns="http://webserviceclasses/" xmlns:xs="http://www.w3.org/2001/XMLSchema">
+
+  <xs:element name="Exception" type="tns:Exception"/>
+
+  <xs:element name="getNestedBeanNames" type="tns:getNestedBeanNames"/>
+
+  <xs:element name="getNestedBeanNamesResponse" type="tns:getNestedBeanNamesResponse"/>
+
+  <xs:element name="sPARKPSBProcessWS" type="tns:sPARKPSBProcessWS"/>
+
+  <xs:element name="sPARKPSBProcessWSResponse" type="tns:sPARKPSBProcessWSResponse"/>
+
+  <xs:complexType name="sPARKPSBProcessWS">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="arg0" type="tns:sparkpsbInputProperties"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sparkpsbInputProperties">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="application" type="xs:string"/>
+      <xs:element minOccurs="0" name="currency" type="xs:string"/>
+      <xs:element minOccurs="0" name="custPO" type="xs:string"/>
+      <xs:element minOccurs="0" name="custShipTo" type="xs:string"/>
+      <xs:element minOccurs="0" name="customer_nbx" type="xs:string"/>
+      <xs:element minOccurs="0" name="deliveryDate" type="xs:string"/>
+      <xs:element minOccurs="0" name="dept" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubAccessHandle" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubConnectionOverrides" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubLinkKey" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStartPoolName" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStyleSheet" type="xs:string"/>
+      <xs:element minOccurs="0" name="msgText" type="xs:string"/>
+      <xs:element minOccurs="0" name="poOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="psbOrderNbx" type="xs:string"/>
+      <xs:element minOccurs="0" name="shipTerm" type="xs:string"/>
+      <xs:element minOccurs="0" name="shipVia" type="xs:string"/>
+      <xs:element minOccurs="0" name="soOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="storeXML" type="xs:string"/>
+      <xs:element minOccurs="0" name="user_id" type="xs:string"/>
+      <xs:element minOccurs="0" name="user_password" type="xs:string"/>
+      <xs:element minOccurs="0" name="warehouse" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sPARKPSBProcessWSResponse">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="return" type="tns:sparkpsbOutputProperties"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="sparkpsbOutputProperties">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="application" type="xs:string"/>
+      <xs:element minOccurs="0" name="currency" type="xs:string"/>
+      <xs:element minOccurs="0" name="custPO" type="xs:string"/>
+      <xs:element minOccurs="0" name="custShipTo" type="xs:string"/>
+      <xs:element minOccurs="0" name="customer_nbx" type="xs:string"/>
+      <xs:element minOccurs="0" name="deliveryDate" type="xs:string"/>
+      <xs:element minOccurs="0" name="dept" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubAccessHandle" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubBeanName" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubBeanType" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubConnectionOverrides" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubEndChainName" type="xs:string"/>
+      <xs:element name="HPubEndType" type="xs:int"/>
+      <xs:element minOccurs="0" name="HPubErrorMessage" type="xs:string"/>
+      <xs:element name="HPubErrorOccurred" type="xs:int"/>
+      <xs:element minOccurs="0" name="HPubLinkKey" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubMacroMessage" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubOutputParmSuffix" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubScreenState" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStartChainName" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubStartPoolName" type="xs:string"/>
+      <xs:element name="HPubStartType" type="xs:int"/>
+      <xs:element minOccurs="0" name="HPubStyleSheet" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubXMLData" type="xs:string"/>
+      <xs:element minOccurs="0" name="HPubXMLProperties" type="xs:string"/>
+      <xs:element minOccurs="0" name="invoice_number" type="xs:string"/>
+      <xs:element minOccurs="0" name="msgText" type="xs:string"/>
+      <xs:element minOccurs="0" name="order_number" type="xs:string"/>
+      <xs:element minOccurs="0" name="poOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="psbOrderNbx" type="xs:string"/>
+      <xs:element minOccurs="0" name="screen_error" type="xs:string"/>
+      <xs:element minOccurs="0" name="screen_name" type="xs:string"/>
+      <xs:element minOccurs="0" name="shipTerm" type="xs:string"/>
+      <xs:element minOccurs="0" name="shipVia" type="xs:string"/>
+      <xs:element minOccurs="0" name="soOffice" type="xs:string"/>
+      <xs:element minOccurs="0" name="storeXML" type="xs:string"/>
+      <xs:element minOccurs="0" name="user_id" type="xs:string"/>
+      <xs:element minOccurs="0" name="user_password" type="xs:string"/>
+      <xs:element minOccurs="0" name="warehouse" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="Exception">
+    <xs:sequence>
+      <xs:element minOccurs="0" name="message" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+
+  <xs:complexType name="getNestedBeanNames">
+    <xs:sequence/>
+  </xs:complexType>
+
+  <xs:complexType name="getNestedBeanNamesResponse">
+    <xs:sequence>
+      <xs:element maxOccurs="unbounded" minOccurs="0" name="return" nillable="true" type="xs:string"/>
+    </xs:sequence>
+  </xs:complexType>
+</xs:schema>

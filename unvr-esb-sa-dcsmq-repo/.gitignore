@@ -1,0 +1,10 @@
+.project
+.settings/
+.settings/*
+.settings/*.*
+.classpath
+target/*
+target/*.*
+target/**
+unvr-esb-sa-dcsmq-app/target/
+unvr-esb-sa-dcsmq-api/target/
