@@ -19,7 +19,7 @@ http://www.mulesoft.org/schema/mule/ee/tracking http://www.mulesoft.org/schema/m
 http://www.mulesoft.org/schema/mule/ws http://www.mulesoft.org/schema/mule/ws/current/mule-ws.xsd
 http://www.mulesoft.org/schema/mule/xml http://www.mulesoft.org/schema/mule/xml/current/mule-xml.xsd
 http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee/dw/current/dw.xsd">
-    <spring:beans>
+<spring:beans>
         <spring:bean id="wmqConnectionFactory" class="com.ibm.mq.jms.MQXAQueueConnectionFactory"> 
             <spring:property name="transportType" value="1"/>
             <spring:property name="queueManager" value="${wmq.queueManger}"/>
@@ -42,6 +42,8 @@ http://www.mulesoft.org/schema/mule/ee/dw http://www.mulesoft.org/schema/mule/ee
 name="wmqConnectionFactoryPool" minPoolSize="${wmq.messaging.minPoolSize}" maxPoolSize="${wmq.messaging.maxPoolSize}" 
 maxIdleTime="${wmq.messaging.maxIdleTime}" connectionFactory-ref="wmqConnectionFactory" />
 
+
+
 <jms:caching-connection-factory name="mqCachingConnectionFactoryPSB" connectionFactory-ref="mqConnectionFactoryPSB" sessionCacheSize="2" username="${wmq.user}" password="${wmq.password}"/>
  <bti:transaction-manager doc:name="Bitronix Transaction Manager"/> 
  
@@ -53,7 +55,7 @@ maxIdleTime="${wmq.messaging.maxIdleTime}" connectionFactory-ref="wmqConnectionF
     <ws:consumer-config  name="Web_Service_Consumer_SOM_Cancel"  wsdlLocation="SalesOrderCancelWSDL/SPARKSOCWSService.wsdl" service="SPARKSOCWSService" port="SPARKSOCWSPort" serviceAddress="${hats.socServiceAddress}" doc:name="Web Service Consumer"/>
 	<ws:consumer-config name="Web_Service_Consumer_PSB" wsdlLocation="PSB/SPARKPSBWSService.wsdl" service="SPARKPSBWSService" port="SPARKPSBWSPort" serviceAddress="${hats.psbServiceAddress}" doc:name="Web Service Consumer" />
 	<configuration defaultResponseTimeout="200000" doc:name="Configuration"/>
-    <wmq:connector name="PSBQueue" validateConnections="true" doc:name="WMQ" connectionFactory-ref="mqCachingConnectionFactoryPSB" numberOfConsumers="2" channel="${wmq.channel}" hostName="${wmq.serverAddress}" password="{wmq.password}" port="${wmq.serverPort}" queueManager="${wmq.queueManger}" transportType="CLIENT_MQ_TCPIP" username="${wmq.user}" specification="1.1" persistentDelivery="true">
+<wmq:connector name="PSBQueue" validateConnections="true" doc:name="WMQ" connectionFactory-ref="mqCachingConnectionFactoryPSB" numberOfConsumers="2" channel="${wmq.channel}" hostName="${wmq.serverAddress}" password="{wmq.password}" port="${wmq.serverPort}" queueManager="${wmq.queueManger}" transportType="CLIENT_MQ_TCPIP" username="${wmq.user}" specification="1.1" persistentDelivery="true">
         <reconnect frequency="${wmq.reconnect.frequency}" count="${wmq.reconnect.count}"/>
     </wmq:connector>
 		    
@@ -186,6 +188,7 @@ maxIdleTime="${wmq.messaging.maxIdleTime}" connectionFactory-ref="wmqConnectionF
 	</flow>	
 	<flow name="MQ-HATS-PSB-Flow">
 		<wmq:inbound-endpoint queue="${wmq.hats.psb.requestqueue}" connector-ref="PSBQueue" doc:name="HATS PSB Request Q">
+            
         </wmq:inbound-endpoint>
         <set-variable variableName="PSBpayload" value="#[payload]" doc:name="PSBpayload"/>
         <dw:transform-message metadata:id="57e38d2d-a8ea-44ca-9269-fefb435a66ea" doc:name="Transform Message">
@@ -202,10 +205,12 @@ maxIdleTime="${wmq.messaging.maxIdleTime}" connectionFactory-ref="wmqConnectionF
         </dw:transform-message>
         <object-to-string-transformer doc:name="Object to String"/>
         <wmq:outbound-endpoint queue="${wmq.hats.psb.replyqueue}" connector-ref="PSBQueue" doc:name="HATS PSB Reply Q" >
+            
         </wmq:outbound-endpoint>
 
         <set-payload value="#[flowVars.PSBpayload]" doc:name="PSBpayload"/>
         <wmq:outbound-endpoint queue="${wmq.hats.psb.backupqueue}" connector-ref="PSBQueue" doc:name="HATS PSB Backup Q" >
+            
         </wmq:outbound-endpoint>
         <logger message="Done putting original payload into HATS PSB backup queue" level="INFO" doc:name="Logger"/>
         <catch-exception-strategy doc:name="Catch Exception Strategy">

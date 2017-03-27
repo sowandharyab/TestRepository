@@ -7,8 +7,8 @@
     <version>1.0.0-SNAPSHOT</version> 
     <!-- <version>${app.version}</version> -->
     <packaging>mule</packaging>
-    <name>Pricing Database API - Integration Application</name>
-    <description>API's to provide access to univar pricing DB </description>
+    <name>DCSMQ SA API - Integration Application</name>
+    <description>API's to provide access to univar DCS via MQ </description>
 
     <properties>
     	<app.version>1.0.0-SNAPSHOT</app.version>	
@@ -17,7 +17,7 @@
 		<mule.version>3.7.3</mule.version>
     	<mule.tools.version>1.1</mule.tools.version>
 		<munit.version>1.1.0</munit.version>
-    	<mule.munit.support.version>3.7.0</mule.munit.support.version>
+    	<mule.munit.support.version>3.7.1</mule.munit.support.version>
     	<!-- application-type : app (Integration application)/api (API Gateway) -->
 	    <application-type>app</application-type>
 	    <mule.env>local</mule.env>
@@ -72,7 +72,7 @@
 							<groupId>org.mule.modules</groupId>
 							<artifactId>mule-module-extensions-spring-support</artifactId>
 						</inclusion>
-					</inclusions>
+                    </inclusions>
 				</configuration>
 			</plugin>
 			<plugin>
@@ -223,7 +223,7 @@
 			        <!-- <domain>unvr-esb-sa-demo-app-dev01</domain> -->
 			        <applicationName>${project.artifactId}-${environment}</applicationName>
                     <properties>
-                        <environment>${environment}</environment>>
+                        <environment>${environment}</environment>&gt;
                         <vault.key>${parm.vault.key}</vault.key>
                         <sfdc.password>${parm.sfdc.password}</sfdc.password>
                         <ldap.password>${parm.ldap.password}</ldap.password>
@@ -244,6 +244,28 @@
                 </executions>
             </plugin>
 
+        <plugin>
+                <groupId>com.mulesoft.munit.tools</groupId>
+                <artifactId>munit-maven-plugin</artifactId>
+                <version>${munit.version}</version>
+                <executions>
+                    <execution>
+                        <id>test</id>
+                        <phase>test</phase>
+                        <goals>
+                            <goal>test</goal>
+                        </goals>
+                    </execution>
+                </executions>
+                <configuration>
+                    <coverage>
+                        <runCoverage>true</runCoverage>
+                        <formats>
+                            <format>html</format>
+                        </formats>
+                    </coverage>
+                </configuration>
+            </plugin>
         </plugins>
 		<testResources>
             <testResource>
@@ -465,7 +487,8 @@
             <artifactId>sqljdbc4</artifactId>
             <version>4.0</version>
         </dependency>
-        <dependency>
+
+    <dependency>
             <groupId>com.mulesoft.muleesb.transports</groupId>
             <artifactId>mule-transport-wmq-ee</artifactId>
             <version>${mule.version}</version>
@@ -477,7 +500,6 @@
             <version>${mule.version}</version>
             <scope>provided</scope>
         </dependency>
- 
     </dependencies>
 
 	<repositories>
@@ -508,6 +530,11 @@
 			<id>mule-ee-releases</id>
 			<name>MuleSoft Repository</name>
 			<url>https://repository-master.mulesoft.org/releases/</url>
+		</repository>
+    <repository>
+            <id>muleforge-releases</id>
+            <name>MuleForge Snapshot Repository</name>
+            <url>https://repository-master.mulesoft.org/nexus/content/repositories/releases/</url>
 		</repository>
     </repositories>
 

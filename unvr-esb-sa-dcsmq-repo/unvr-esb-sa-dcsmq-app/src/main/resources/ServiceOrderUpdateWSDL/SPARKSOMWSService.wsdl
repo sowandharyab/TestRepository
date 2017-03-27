@@ -67,7 +67,11 @@
   </binding>
   <service name="SPARKSOMWSService">
     <port name="SPARKSOMWSPort" binding="tns:SPARKSOMWSPortBinding">
+<<<<<<< HEAD
       <soap:address location="http://ltv-sea-hatsws1.chemd.net:80/Spark_SOE_Sales_Order_Entry/SPARKSOMWSService"/>
+=======
+      <soap:address location="http://10.197.12.20:80/Spark_SOE_Sales_Order_Entry/SPARKSOMWSService"/>
+>>>>>>> test
     </port>
   </service>
 </definitions>
